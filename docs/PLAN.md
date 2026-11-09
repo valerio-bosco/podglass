@@ -161,6 +161,11 @@ Commands (`podglass set ...`, and the same verbs as `{"cmd": ...}` lines on the 
 | BlueZ Connected true | | `start_aap`, tray icon visible |
 | BlueZ Connected false | | `stop_aap`, tray icon hidden |
 
+Extra rules added in P1.6 (not in the table above, needed in practice): after `connect-failed`
+no automatic connect for 30 s; after a user `disconnect` no automatic connect until both pods
+leave the ears or the lid closes; `card_timeout_s > 0` hides the card after that time; the
+"busy elsewhere" connection-state values are a constructor argument, empty until P0.4.
+
 The policy is a pure class: `Policy(config).step(event: Event, now: float) -> list[Action]`. No
 I/O inside. Every row above is one test in `tests/test_policy.py`.
 
@@ -225,7 +230,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
 
 ### Phase 1 - pure core (can run in parallel with phase 0 after P1.1)
 
-- [ ] **P1.1 Scaffold** - Model: Sonnet - Depends: - - Read: section 3, `~/Projects/oring/flake.nix` (pattern only)
+- [x] **P1.1 Scaffold** - Model: Sonnet - Depends: - - Read: section 3, `~/Projects/oring/flake.nix` (pattern only)
   - Do: create the layout of section 3 (empty modules with docstrings), `pyproject.toml`
     (console script `podglass = podglass.__main__:main`), `flake.nix` with devShell
     (`python3.withPackages [bleak dbus-fast cryptography pytest]`, `quickshell`, `playerctl`,
@@ -233,12 +238,12 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
     `.gitignore` (`assets/renders/`, `assets/models/`, `__pycache__`, `result`).
   - Done when: `nix develop -c pytest -q` exits 0 (no tests yet is fine: use `-q || [ $? = 5 ]`),
     `nix flake check` passes.
-- [ ] **P1.2 crypto.py** - Model: Haiku - Depends: P1.1 - Read: PROTOCOL.md 1.1, 1.3
+- [x] **P1.2 crypto.py** - Model: Haiku - Depends: P1.1 - Read: PROTOCOL.md 1.1, 1.3
   - Do: `ah(irk: bytes, prand: bytes) -> bytes`, `resolve_rpa(addr: str, irk: bytes) -> bool`,
     `decrypt_payload(payload16: bytes, key: bytes) -> bytes` using `cryptography`.
   - Done when: `pytest tests/test_crypto.py` passes, including the Core Spec vector, a non-RPA
     address (top bits != 01) returning False, and wrong key sizes raising `ValueError`.
-- [ ] **P1.3 adv.py** - Model: Haiku - Depends: P1.1 (fixtures from P0.2 when available) - Read: PROTOCOL.md 1
+- [x] **P1.3 adv.py** - Model: Haiku - Depends: P1.1 (fixtures from P0.2 when available) - Read: PROTOCOL.md 1
   - Do: frozen dataclass `Advert(addr, rssi, model, paired, primary_left, left, right, case,
     left_charging, right_charging, case_charging, left_in_ear, right_in_ear, lid_open, lid_known,
     lid_counter, conn_state, encrypted)`; `parse_advert(data: bytes, rssi: int, addr: str) -> Advert | None`
@@ -246,22 +251,22 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
     `Advert(paired=False, ...)` with only model filled).
   - Done when: tests cover both primary sides, 15 = unknown, every status bit, short input; once
     P0 fixtures exist, every fixture line parses without exception.
-- [ ] **P1.4 aap.py** - Model: Haiku - Depends: P1.1 - Read: PROTOCOL.md 2
+- [x] **P1.4 aap.py** - Model: Haiku - Depends: P1.1 - Read: PROTOCOL.md 2
   - Do: constants for the startup packets; `set_mode(mode: str) -> bytes`, `set_ca(on) -> bytes`,
     `set_adaptive_level(n) -> bytes`, `request_keys() -> bytes`;
     `parse_packet(b: bytes) -> AapEvent | None` with event classes `Battery`, `Ear`, `Mode`,
     `ConversationAwareness`, `CaVolume`, `Keys`, `DeviceInfo`, `Ack`, `Unknown(opcode, raw)`.
   - Done when: every example packet in PROTOCOL.md round-trips in tests; garbage input never raises.
-- [ ] **P1.5 state.py** - Model: Haiku - Depends: P1.3, P1.4 - Read: section 3.1
+- [x] **P1.5 state.py** - Model: Haiku - Depends: P1.3, P1.4 - Read: section 3.1
   - Do: `DeviceState` dataclass; `apply_advert(state, adv)`, `apply_aap(state, event)` (AAP values win
     over BLE values while connected; `precise` follows the source), `to_json(state) -> str` matching
     section 3.1 exactly.
   - Done when: tests for merge precedence and a golden JSON test.
-- [ ] **P1.6 policy.py** - Model: Sonnet - Depends: P1.5 - Read: section 3.2
+- [x] **P1.6 policy.py** - Model: Sonnet - Depends: P1.5 - Read: section 3.2
   - Do: as described in 3.2, with an injectable clock.
   - Done when: one test per table row plus: no `connect` while `connecting`; no second `show_card`
     while the lid stays open; `hide_card` cancelled if the lid reopens within 1.5 s.
-- [ ] **P1.7 config.py + keys.py** - Model: Haiku - Depends: P1.1
+- [x] **P1.7 config.py + keys.py** - Model: Haiku - Depends: P1.1
   - Do: config keys and defaults: `autoconnect = "in-ear"`, `ear_pause = true`,
     `ca_duck = true`, `ca_duck_volume = 0.3`, `battery_widget = false`, `card_timeout_s = 0`
     (0 = stay while lid open), `theme = "auto"`. keys.json written atomically with mode 0600.
