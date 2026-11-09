@@ -22,8 +22,8 @@ Start with `docs/PLAN.md` section 0, then do exactly one task.
   fix the doc in the same commit.
 
 ## License
-Until decision D2 in PLAN.md is answered, treat the project as GPL-3.0-or-later. Even so, do not
-paste LibrePods code: write it from PROTOCOL.md.
+GPL-3.0-or-later (decision D2, `LICENSE`). Protocol facts still come from PROTOCOL.md; if code is
+ported from LibrePods (also GPL-3.0), say so in a comment at the top of the file with the source path.
 
 ## Commands
 - Tests: `nix develop -c pytest -q`

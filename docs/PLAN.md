@@ -53,7 +53,7 @@ Model legend:
 | Id | Question | Answer |
 |---|---|---|
 | D1 | 3D model source | **Answered 2026-11-09:** model it ourselves in Blender; if that does not reach the look, fall back to a model found online (free or bought). P3.0 changes from "get the model" to "build the model". |
-| D2 | License: GPL-3.0 (allows reading/porting LibrePods code) or MIT (then LibrePods code must not be copied) | open - default GPL-3.0 |
+| D2 | License | **Answered 2026-11-09:** GPL-3.0-or-later (LICENSE). LibrePods code may be ported, with credit in the file header. |
 | D3 | Auto-connect default: `in-ear` / `lid-open` / `never` | **Answered 2026-11-09:** `in-ear` |
 | D4 | UI language: English / Italian | **Answered 2026-11-09:** English (strings in one file, `ui/Strings.qml`) |
 

@@ -12,3 +12,5 @@ Status: planning. Mockups: https://claude.ai/artifact/T8eXQvMCq843nEaAqUPyP8 (al
 - Agent rules: `AGENTS.md`
 
 Protocol knowledge comes from the LibrePods project (https://github.com/kavishdevar/librepods).
+
+License: GPL-3.0-or-later (see `LICENSE`).
