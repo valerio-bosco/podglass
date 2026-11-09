@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "podglass"
+version = "0.1.0"
+description = "AirPods Pro 2 integration for NixOS + Hyprland"
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.11"
+dependencies = ["bleak", "dbus-fast", "cryptography"]
+
+[project.scripts]
+podglass = "podglass.__main__:main"
+
+[tool.setuptools]
+packages = ["podglass"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
