@@ -1,0 +1,480 @@
+<title>podglass mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600&family=Hanken+Grotesk:wght@400;500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: one column; a scaled "desktop stage" with the live widget mockups on top, then feasibility, 3D, phases, decisions. */
+:root{
+  --bg:#EEF0F3; --surface:#FFFFFF; --ink:#16181D; --muted:#5A6170; --line:#D9DDE4;
+  --accent:#2B5BD7; --ok:#1F8A4C; --warn:#A86A00; --bad:#B42318;
+  --ok-bg:#E3F4EA; --warn-bg:#FBF0DA; --bad-bg:#FBE4E1;
+  --display:"Sora",ui-sans-serif,system-ui,sans-serif;
+  --body:"Hanken Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --ui:"Inter",-apple-system,ui-sans-serif,system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111318; --surface:#1A1D24; --ink:#E9ECF2; --muted:#9AA3B2; --line:#2B303A;
+  --accent:#7EA2FF; --ok:#5FD08F; --warn:#E8B04A; --bad:#FF7B6E;
+  --ok-bg:#16301F; --warn-bg:#33270F; --bad-bg:#3A1A17; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111318; --surface:#1A1D24; --ink:#E9ECF2; --muted:#9AA3B2; --line:#2B303A;
+  --accent:#7EA2FF; --ok:#5FD08F; --warn:#E8B04A; --bad:#FF7B6E;
+  --ok-bg:#16301F; --warn-bg:#33270F; --bad-bg:#3A1A17; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--body)}
+.wrap{max-width:1140px;margin:0 auto;padding-inline:16px;padding-block:28px 64px;display:grid;gap:44px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.2}
+h1{font-size:clamp(28px,4vw,40px);font-weight:600;letter-spacing:-.02em}
+h2{font-size:22px;font-weight:600}
+h3{font-size:16px;font-weight:600}
+p{margin:0;max-width:68ch}
+.eyebrow{font:500 12px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+header{display:grid;gap:12px}
+.lede{color:var(--muted);font-size:17px}
+section{display:grid;gap:16px;min-width:0}
+code,.mono{font-family:var(--mono);font-size:13px}
+
+/* verdict strip */
+.verdict{display:flex;flex-wrap:wrap;gap:10px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font:600 13px/1.3 var(--body);white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.c-ok{background:var(--ok-bg);color:var(--ok)} .c-warn{background:var(--warn-bg);color:var(--warn)} .c-bad{background:var(--bad-bg);color:var(--bad)}
+
+/* controls */
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button,.tbtn{font:500 14px/1 var(--body);padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg button:focus-visible,.tbtn:focus-visible,.stage button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.spacer{flex:1}
+.hint{color:var(--muted);font-size:14px}
+
+/* ===== stage: fixed 1100x620 desktop, scaled to fit ===== */
+.stage-outer{width:100%;position:relative;border-radius:14px;overflow:hidden;box-shadow:0 1px 0 var(--line),0 12px 40px rgba(0,0,0,.18)}
+.stage{position:absolute;left:0;top:0;width:1100px;height:620px;transform-origin:0 0;overflow:hidden;font-family:var(--ui);
+  background:
+   radial-gradient(60% 80% at 18% 30%,#3a4f86 0%,transparent 60%),
+   radial-gradient(50% 70% at 85% 75%,#7a3d6b 0%,transparent 60%),
+   radial-gradient(40% 50% at 60% 20%,#1f6f78 0%,transparent 60%),
+   #141824;
+  /* widget tokens (dark) */
+  --g:rgba(30,30,32,.72); --lab:#fff; --sec:rgba(235,235,245,.6); --fill:rgba(118,118,128,.24);
+  --hair:rgba(255,255,255,.08); --acc:#0A84FF; --grn:#30D158; --red:#FF453A; --sh:0 20px 60px rgba(0,0,0,.35)}
+.stage[data-w="light"]{--g:rgba(246,246,248,.78); --lab:#000; --sec:rgba(60,60,67,.6); --fill:rgba(118,118,128,.12);
+  --hair:rgba(0,0,0,.06); --acc:#007AFF; --grn:#34C759; --red:#FF3B30; --sh:0 20px 60px rgba(0,0,0,.18)}
+.stage *{box-sizing:border-box}
+.stage button{font-family:var(--ui);cursor:pointer;border:0}
+
+/* top bar (serpantinum-like, simplified) */
+.bar{position:absolute;left:8px;right:8px;top:6px;height:34px;border-radius:12px;background:rgba(18,20,28,.84);display:flex;align-items:center;padding:0 12px;gap:10px;color:#cdd3e0;font:500 13px/1 var(--ui)}
+.ws{display:flex;gap:5px}.ws i{width:8px;height:8px;border-radius:4px;background:#4b5368}.ws i.on{width:22px;background:#8fb0ff}
+.bar .mid{position:absolute;left:50%;transform:translateX(-50%);font-variant-numeric:tabular-nums}
+.bar .right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tray{display:flex;gap:8px;align-items:center;padding-right:10px;border-right:1px solid #2c3242}
+.tray .dot{width:14px;height:14px;border-radius:4px;background:#3a4256}
+.trayPods{width:26px;height:22px;border-radius:7px;display:grid;place-items:center;color:#e8ecf5;transition:background .15s}
+.trayPods.active{background:rgba(143,176,255,.25)}
+.trayPods[hidden]{display:none!important}
+.sys{display:flex;gap:10px;opacity:.85}
+
+/* glass panels */
+.glass{background:var(--g);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:1px solid var(--hair);box-shadow:var(--sh);color:var(--lab)}
+
+/* card */
+.card{position:absolute;width:360px;border-radius:38px;padding:20px;display:grid;gap:4px;
+  transition:transform .42s cubic-bezier(.34,1.3,.64,1),opacity .3s}
+.card.hide{opacity:0;transform:translateY(60px) scale(.96);pointer-events:none}
+.card .top{display:grid;grid-template-columns:30px 1fr 30px;align-items:center}
+.card .title{text-align:center;font:600 19px/1.2 var(--ui)}
+.xbtn{width:30px;height:30px;border-radius:50%;background:var(--fill);color:var(--sec);display:grid;place-items:center}
+.render{height:230px;display:grid;place-items:center}
+.render svg{width:280px;height:230px}
+.cardBottom{min-height:96px;display:grid;align-items:center}
+.cta{height:50px;border-radius:14px;width:100%;background:var(--acc);color:#fff;font:600 17px/1 var(--ui);display:flex;gap:10px;align-items:center;justify-content:center}
+.cta.busy{background:var(--fill);color:var(--lab)}
+.spin{width:18px;height:18px;border-radius:50%;border:2.5px solid var(--sec);border-top-color:transparent;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.rings{display:flex;justify-content:center;gap:44px}
+.ring{display:grid;justify-items:center;gap:2px}
+.ring .pct{font:600 15px/1.2 var(--ui);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:3px}
+.ring .lbl{font:400 13px/1.2 var(--ui);color:var(--sec)}
+.rsvg{position:relative;display:grid;place-items:center}
+.rsvg svg.arc{transform:rotate(-90deg)}
+.rsvg .glyph{position:absolute;inset:0;display:grid;place-items:center;color:var(--lab)}
+
+/* popover */
+.pop{position:absolute;right:20px;top:48px;width:320px;border-radius:26px;padding:16px;display:grid;gap:14px;transform-origin:top right;transition:opacity .2s,transform .2s}
+.pop.hide{opacity:0;transform:scale(.96) translateY(-6px);pointer-events:none}
+.pophead{display:flex;align-items:center;gap:10px}
+.pophead .nm{font:600 15px/1.2 var(--ui)} .pophead .st{font:400 13px/1.2 var(--ui);color:var(--sec)}
+.sect{font:400 13px/1 var(--ui);color:var(--sec)}
+.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.mode{background:none;display:grid;justify-items:center;gap:6px;color:var(--lab);padding:0}
+.mode .c{width:52px;height:52px;border-radius:50%;background:var(--fill);display:grid;place-items:center;transition:background .15s,color .15s}
+.mode[aria-pressed="true"] .c{background:var(--acc);color:#fff}
+.mode span{font:500 11px/1.15 var(--ui);text-align:center}
+.row{display:flex;align-items:center;justify-content:space-between;min-height:44px;font:400 15px/1.2 var(--ui)}
+.sw{width:51px;height:31px;border-radius:16px;background:var(--fill);position:relative;transition:background .2s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:left .2s}
+.sw[aria-checked="true"]{background:var(--grn)} .sw[aria-checked="true"]::after{left:22px}
+.slider{display:grid;gap:6px}
+.slider input{width:100%;accent-color:var(--acc)}
+.slider .ends{display:flex;justify-content:space-between;font:400 11px/1 var(--ui);color:var(--sec)}
+.foot{border-top:1px solid var(--hair);padding-top:10px;display:flex;justify-content:space-between;align-items:center}
+.linkbtn{background:none;color:var(--acc);font:500 15px/1 var(--ui);padding:4px 0}
+.fw{font:500 11px/1 var(--ui);color:var(--sec)}
+
+/* desktop battery widget */
+.widget{position:absolute;left:24px;bottom:24px;width:340px;height:160px;border-radius:24px;padding:18px;display:flex;justify-content:space-around;align-items:center;transition:opacity .25s}
+.widget.hide{opacity:0;pointer-events:none}
+
+/* edit mode */
+.edit{position:absolute;inset:0;background:rgba(0,0,0,.45);transition:opacity .2s}
+.edit.hide{opacity:0;pointer-events:none}
+.ghost{position:absolute;border:2px dashed rgba(255,255,255,.7);border-radius:38px;cursor:grab;touch-action:none;background:rgba(255,255,255,.04)}
+.ghost:active{cursor:grabbing}
+.ghost .tag{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#fff;color:#000;font:600 12px/1 var(--ui);padding:6px 10px;border-radius:999px;white-space:nowrap}
+.guide{position:absolute;background:#0A84FF;opacity:0;transition:opacity .1s}
+.guide.v{width:1px;top:0;bottom:0}.guide.h{height:1px;left:0;right:0}
+.guide.on{opacity:1}
+.toolbar{position:absolute;top:56px;left:50%;transform:translateX(-50%);height:44px;border-radius:22px;display:flex;align-items:center;gap:6px;padding:0 6px 0 16px;background:rgba(30,30,32,.85);color:#fff;font:400 13px/1 var(--ui);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.toolbar button{height:32px;padding:0 14px;border-radius:16px;background:rgba(118,118,128,.3);color:#fff;font:500 13px/1 var(--ui)}
+.toolbar button.done{background:#0A84FF}
+.toolbar .cap{opacity:.7;margin-right:8px}
+
+.caption{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;color:var(--muted);font-size:14px}
+.caption b{color:var(--ink);font-weight:600}
+
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:15px}
+th,td{text-align:left;vertical-align:top;padding:12px 14px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+th{font:600 12px/1.2 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:color-mix(in srgb,var(--surface) 70%,var(--bg))}
+td:first-child{font-weight:600;width:24%}
+td.how{color:var(--muted)}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.opt{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:8px;align-content:start}
+.opt.pick{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.opt .tag2{font:600 12px/1 var(--body);color:var(--accent);letter-spacing:.04em;text-transform:uppercase}
+.opt p{color:var(--muted);font-size:15px}
+
+ol.phases{list-style:none;margin:0;padding:0;display:grid;gap:0;border-left:2px solid var(--line);margin-left:6px}
+ol.phases li{position:relative;padding:0 0 18px 22px;display:grid;gap:4px}
+ol.phases li::before{content:"";position:absolute;left:-7px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+ol.phases .who{display:flex;flex-wrap:wrap;gap:6px}
+.m{font:600 12px/1 var(--body);padding:4px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+.m.h{color:var(--ok)} .m.s{color:var(--accent)} .m.u{color:var(--warn)}
+ol.phases p{color:var(--muted);font-size:15px}
+
+.dec{display:grid;gap:10px}
+.dec div{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:baseline;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.dec b{font-family:var(--mono);font-size:13px;color:var(--accent)}
+.dec span{min-width:0}
+.dec em{font-style:normal;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){.card,.pop,.widget,.edit,.sw::after{transition:none}.spin{animation:none}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="gBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#eef0f3"/><stop offset="1" stop-color="#d4d8de"/></linearGradient>
+    <linearGradient id="gSide" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff" stop-opacity=".9"/><stop offset=".25" stop-color="#ffffff" stop-opacity="0"/><stop offset=".85" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".08"/></linearGradient>
+    <linearGradient id="gLid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfbfc"/><stop offset="1" stop-color="#dfe2e7"/></linearGradient>
+    <radialGradient id="gPod" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#eceef1"/><stop offset="1" stop-color="#cfd3d9"/></radialGradient>
+    <filter id="fBlur" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="5"/></filter>
+  </defs>
+  <symbol id="caseOpen" viewBox="0 0 240 230">
+    <ellipse cx="120" cy="208" rx="84" ry="8" fill="#000" opacity=".35" filter="url(#fBlur)"/>
+    <path d="M52 100 C50 64 58 32 80 24 L160 24 C182 32 190 64 188 100 Z" fill="url(#gLid)"/>
+    <path d="M62 98 C61 68 68 40 86 34 L154 34 C172 40 179 68 178 98" fill="none" stroke="#000" stroke-opacity=".07" stroke-width="2"/>
+    <rect x="104" y="88" width="32" height="7" rx="3.5" fill="#b9bdc4"/>
+    <rect x="44" y="88" width="152" height="36" rx="18" fill="#f2f3f5"/>
+    <ellipse cx="94" cy="104" rx="24" ry="8" fill="#c8ccd2"/>
+    <ellipse cx="146" cy="104" rx="24" ry="8" fill="#c8ccd2"/>
+    <g transform="rotate(-14 94 86)"><ellipse cx="94" cy="86" rx="21" ry="17" fill="url(#gPod)"/><ellipse cx="86" cy="80" rx="7" ry="5" fill="#2b2e33"/><ellipse cx="102" cy="94" rx="9" ry="6" fill="#e3e6ea"/></g>
+    <g transform="rotate(14 146 86)"><ellipse cx="146" cy="86" rx="21" ry="17" fill="url(#gPod)"/><ellipse cx="154" cy="80" rx="7" ry="5" fill="#2b2e33"/><ellipse cx="138" cy="94" rx="9" ry="6" fill="#e3e6ea"/></g>
+    <path d="M40 112 Q40 104 48 104 L192 104 Q200 104 200 112 L200 166 Q200 200 166 200 L74 200 Q40 200 40 166 Z" fill="url(#gBody)"/>
+    <path d="M40 112 Q40 104 48 104 L192 104 Q200 104 200 112 L200 166 Q200 200 166 200 L74 200 Q40 200 40 166 Z" fill="url(#gSide)"/>
+    <path d="M44 106 L196 106" stroke="#000" stroke-opacity=".08"/>
+    <rect x="199" y="132" width="5" height="18" rx="2" fill="#d3d6db"/>
+    <circle cx="120" cy="146" r="2.6" fill="#30D158"/><circle cx="120" cy="146" r="6" fill="#30D158" opacity=".18"/>
+    <g fill="#9aa0a8" opacity=".6"><circle cx="96" cy="194" r="1"/><circle cx="101" cy="195" r="1"/><circle cx="106" cy="195.5" r="1"/><circle cx="134" cy="195.5" r="1"/><circle cx="139" cy="195" r="1"/><circle cx="144" cy="194" r="1"/></g>
+  </symbol>
+  <symbol id="pod" viewBox="0 0 40 52">
+    <ellipse cx="17" cy="15" rx="12" ry="11" fill="url(#gPod)"/>
+    <ellipse cx="9" cy="18" rx="6" ry="7" fill="#dde0e4"/>
+    <ellipse cx="20" cy="10" rx="4" ry="3" fill="#2b2e33"/>
+    <rect x="20" y="18" width="8" height="31" rx="4" fill="url(#gPod)" transform="rotate(-8 24 33)"/>
+    <rect x="22.6" y="43" width="7" height="5" rx="2.5" fill="#9aa0a8" transform="rotate(-8 24 33)"/>
+  </symbol>
+  <symbol id="caseSmall" viewBox="0 0 44 36">
+    <rect x="3" y="4" width="38" height="28" rx="11" fill="url(#gBody)"/>
+    <path d="M4 13 H40" stroke="#000" stroke-opacity=".12"/>
+    <circle cx="22" cy="21" r="1.4" fill="#30D158"/>
+  </symbol>
+  <symbol id="podsPair" viewBox="0 0 60 52">
+    <use href="#pod" x="0" y="0" width="34" height="46"/>
+    <g transform="translate(60 0) scale(-1 1)"><use href="#pod" x="0" y="4" width="34" height="46"/></g>
+  </symbol>
+  <symbol id="bolt" viewBox="0 0 10 14"><path d="M6 0 L0 8 H4 L3 14 L10 5 H6 Z" fill="currentColor"/></symbol>
+  <symbol id="iOff" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="iTr" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3.1"/></symbol>
+  <symbol id="iAd" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4 A8 8 0 0 1 12 20 Z" fill="currentColor"/></symbol>
+  <symbol id="iAnc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="currentColor"/><circle cx="12" cy="12" r="4.5" fill="none" stroke="var(--g)" stroke-width="2"/></symbol>
+  <symbol id="trayPods" viewBox="0 0 22 18"><g fill="currentColor"><ellipse cx="6" cy="5" rx="4" ry="3.6"/><rect x="6.5" y="6" width="2.6" height="10" rx="1.3"/><ellipse cx="16" cy="5" rx="4" ry="3.6"/><rect x="12.9" y="6" width="2.6" height="10" rx="1.3"/></g></symbol>
+</svg>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">podglass · AirPods Pro 2 su NixOS + Hyprland</div>
+    <h1>Mockup e fattibilità</h1>
+    <p class="lede">Si può fare quasi tutto come su iPhone. Le tre cose da sapere: la prima volta le AirPods vanno abbinate a mano una volta sola, non “rubano” l'audio all'iPhone come fa iCloud, e i modelli 3D perfetti vanno comprati e renderizzati, perché quelli di Apple non sono disponibili.</p>
+    <div class="verdict">
+      <span class="chip c-ok">Coperchio, batterie, modalità rumore: sicuro</span>
+      <span class="chip c-warn">Connessione automatica: da misurare sul tuo hardware</span>
+      <span class="chip c-warn">Modelli 3D: serve un modello a pagamento</span>
+    </div>
+  </header>
+
+  <section aria-labelledby="mk">
+    <h2 id="mk">Come appare sul tuo schermo</h2>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Scena">
+        <button id="sc1" data-scene="lid" aria-pressed="true">Apri il cofanetto</button>
+        <button id="sc2" data-scene="connecting" aria-pressed="false">Connessione</button>
+        <button id="sc3" data-scene="connected" aria-pressed="false">Connesse</button>
+        <button id="sc4" data-scene="popover" aria-pressed="false">Menu dalla barra</button>
+        <button id="sc5" data-scene="widget" aria-pressed="false">Widget batterie</button>
+        <button id="sc6" data-scene="edit" aria-pressed="false">Modifica posizione</button>
+      </div>
+      <span class="spacer"></span>
+      <div class="seg" role="group" aria-label="Tema del widget">
+        <button id="wd" data-w="dark" aria-pressed="true">Scuro</button>
+        <button id="wl" data-w="light" aria-pressed="false">Chiaro</button>
+      </div>
+    </div>
+
+    <div class="stage-outer" id="outer">
+      <div class="stage" id="stage" data-w="dark">
+        <div class="bar">
+          <div class="ws"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+          <div class="mid" id="clock">14:32:08</div>
+          <div class="right">
+            <div class="tray">
+              <span class="dot"></span><span class="dot"></span>
+              <button class="trayPods" id="trayPods" aria-label="AirPods" hidden><svg width="20" height="16"><use href="#trayPods"/></svg></button>
+            </div>
+            <div class="sys"><span>CPU 12%</span><span>wifi</span><span>bt</span><span>vol 40</span><span>100%</span></div>
+          </div>
+        </div>
+
+        <div class="widget glass hide" id="widget"></div>
+
+        <div class="card glass" id="card" style="left:370px;top:186px">
+          <div class="top">
+            <span></span>
+            <div class="title">AirPods Pro</div>
+            <button class="xbtn" id="cardX" aria-label="Chiudi"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+          </div>
+          <div class="render"><svg><use href="#caseOpen"/></svg></div>
+          <div class="cardBottom" id="cardBottom"></div>
+        </div>
+
+        <div class="pop glass hide" id="pop">
+          <div class="pophead">
+            <svg width="44" height="40"><use href="#podsPair"/></svg>
+            <div><div class="nm">AirPods Pro di Valerio</div><div class="st">Connesse</div></div>
+          </div>
+          <div class="rings" id="popRings" style="gap:36px"></div>
+          <div class="sect">Listening Mode</div>
+          <div class="modes" id="modes">
+            <button class="mode" id="m-off" data-m="off" aria-pressed="false"><span class="c"><svg width="24" height="24"><use href="#iOff"/></svg></span><span>Off</span></button>
+            <button class="mode" id="m-tr" data-m="tr" aria-pressed="false"><span class="c"><svg width="24" height="24"><use href="#iTr"/></svg></span><span>Transparency</span></button>
+            <button class="mode" id="m-ad" data-m="ad" aria-pressed="false"><span class="c"><svg width="24" height="24"><use href="#iAd"/></svg></span><span>Adaptive</span></button>
+            <button class="mode" id="m-anc" data-m="anc" aria-pressed="true"><span class="c"><svg width="24" height="24"><use href="#iAnc"/></svg></span><span>Noise Cancel.</span></button>
+          </div>
+          <div class="slider" id="adSlider" hidden>
+            <input id="adLevel" type="range" min="0" max="100" value="50" aria-label="Adaptive level">
+            <div class="ends"><span>More noise</span><span>Less noise</span></div>
+          </div>
+          <div class="row"><span>Conversation Awareness</span><button class="sw" id="caSw" role="switch" aria-checked="true" aria-label="Conversation Awareness"></button></div>
+          <div class="foot"><button class="linkbtn" id="disc">Disconnect</button><span class="fw">Firmware 7A305</span></div>
+        </div>
+
+        <div class="edit hide" id="edit">
+          <div class="guide v" id="gv" style="left:550px"></div>
+          <div class="guide h" id="gh" style="top:310px"></div>
+          <div class="ghost" id="ghostCard" style="width:360px;height:410px"><span class="tag">AirPods card</span></div>
+          <div class="ghost" id="ghostWidget" style="width:340px;height:160px;border-radius:24px"><span class="tag">Battery widget</span></div>
+          <div class="toolbar"><span class="cap">Drag to place</span><button id="eReset">Reset</button><button id="eCancel">Cancel</button><button class="done" id="eDone">Done</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="caption" id="caption"></div>
+  </section>
+
+  <section aria-labelledby="fz">
+    <h2 id="fz">Fattibilità, punto per punto</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Cosa vuoi</th><th>Esito</th><th>Come si fa</th></tr></thead>
+      <tbody>
+        <tr><td>Apro il cofanetto e compare la scheda</td><td><span class="chip c-ok">Sicuro</span></td><td class="how">Le AirPods trasmettono via Bluetooth LE un pacchetto Apple (tipo <code>0x07</code>) con stato del coperchio, batterie e cuffie in orecchio, anche senza connessione. Il PC lo ascolta di continuo.</td></tr>
+        <tr><td>Batteria sinistra, destra e custodia</td><td><span class="chip c-ok">Sicuro</span></td><td class="how">Da connesse: precisa all'1% via protocollo AAP (il canale privato Apple, già documentato da altri). Da non connesse: a passi del 10%, finché non decifriamo il pacchetto cifrato (la chiave si ottiene dalle cuffie).</td></tr>
+        <tr><td>Riconoscere le mie AirPods e non quelle del vicino</td><td><span class="chip c-ok">Sicuro</span></td><td class="how">Alla prima connessione le cuffie danno al PC la loro chiave IRK (chiave che permette di riconoscere un indirizzo Bluetooth che cambia ogni 15 minuti). Prima di allora la scheda mostra solo “Connect”.</td></tr>
+        <tr><td>Metto le cuffie e sono già collegato</td><td><span class="chip c-warn">Da misurare</span></td><td class="how">Il PC vede “in orecchio” e chiede a BlueZ (il servizio Bluetooth di Linux) di connettere. Manca iCloud: se le stai usando sull'iPhone, il PC non deve rubarle. Per questo la fase 0 misura il byte che dice “occupate altrove”.</td></tr>
+        <tr><td>Off / Trasparenza / Adattivo / Riduzione rumore</td><td><span class="chip c-ok">Sicuro</span></td><td class="how">Un pacchetto AAP per modalità, già provato su AirPods Pro 2 USB-C. Il “suono ambientale” che dici è la modalità Adattivo. Bonus: Conversation Awareness e pausa togliendo una cuffia.</td></tr>
+        <tr><td>Aprirlo dalla barra in alto</td><td><span class="chip c-ok">Sicuro</span></td><td class="how">La barra serpantinum non accetta moduli esterni, ma mostra il tray. Il servizio pubblica un'icona nel tray solo quando sono connesse; clic = menu.</td></tr>
+        <tr><td>Posizione libera con menu di modifica</td><td><span class="chip c-ok">Sicuro</span></td><td class="how">Finestre Quickshell sul layer di Wayland con ancoraggi e margini salvati per monitor. Vetro sfocato con le regole layer di Hyprland.</td></tr>
+        <tr><td>Modelli 3D perfetti</td><td><span class="chip c-warn">Serve un acquisto</span></td><td class="how">Apple non pubblica i modelli delle AirPods. Strada: modello commerciale fedele della Pro 2 USB-C (circa 20–60 €), render fotorealistici con Blender una volta sola, animazione del coperchio come su iPhone. La resa finale la approvi tu confrontando con quelle vere.</td></tr>
+        <tr><td>Rischio audio</td><td><span class="chip c-bad">Da testare</span></td><td class="how">Il tuo adattatore è Realtek: alcuni gracchiano se ascoltano il Bluetooth LE mentre suonano musica. La fase 0 prova la scansione passiva (va attivata un'opzione sperimentale di BlueZ) prima di scegliere.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="m3">
+    <h2 id="m3">Modelli 3D: le opzioni</h2>
+    <div class="grid2">
+      <div class="opt pick"><span class="tag2">Consigliata</span><h3>Modello commerciale + Blender</h3><p>Compri un modello fedele con coperchio e cuffie separati. Uno script Blender genera animazione di apertura, rotazione lenta e icone, con sfondo trasparente. Nessun costo a runtime: sono immagini.</p></div>
+      <div class="opt"><span class="tag2">Gratis</span><h3>Modello gratuito trovato online</h3><p>Qualità variabile: spesso la custodia è della Pro 1 o mancano la griglia dell'altoparlante e l'anello del laccio. Va bene come prova.</p></div>
+      <div class="opt"><span class="tag2">Più costosa</span><h3>Modellazione su misura</h3><p>Un modellatore 3D lo rifà dalle misure reali. Massima fedeltà, ma costa e richiede tempo. Gli agenti economici non possono farlo.</p></div>
+    </div>
+    <p class="hint">Finché il modello non c'è, l'interfaccia usa i disegni segnaposto che vedi sopra, così il lavoro non si blocca.</p>
+  </section>
+
+  <section aria-labelledby="ph">
+    <h2 id="ph">Il piano, in breve</h2>
+    <p class="hint">Il piano completo è in <code>~/Projects/podglass/docs/PLAN.md</code>: ogni compito dice quale modello lo fa, quali file leggere e quale comando deve passare. Haiku fa il codice puro con test; Sonnet fa Bluetooth, interfaccia, Nix e Blender; i controlli sull'hardware li fai tu.</p>
+    <ol class="phases">
+      <li><h3>Fase 0 · Prova sul tuo hardware</h3><div class="who"><span class="m s">Sonnet</span><span class="m u">Tu</span></div><p>Abbinamento delle AirPods, registrazione dei pacchetti reali (coperchio, orecchio, iPhone in uso), test di scatti audio. Cancello: nulla di Bluetooth parte prima della revisione.</p></li>
+      <li><h3>Fase 1 · Nucleo puro</h3><div class="who"><span class="m h">Haiku</span><span class="m s">Sonnet</span></div><p>Decodifica dei pacchetti, crittografia, stato, regole di connessione. Tutto testato sui pacchetti registrati.</p></li>
+      <li><h3>Fase 2 · Servizio di sistema</h3><div class="who"><span class="m s">Sonnet</span><span class="m h">Haiku</span></div><p>BlueZ, sessione AAP, scansione, icona nel tray, comandi da terminale, pausa musica.</p></li>
+      <li><h3>Fase 3 · Render 3D</h3><div class="who"><span class="m u">Tu</span><span class="m s">Sonnet</span></div><p>Acquisto del modello, script Blender, approvazione a occhio.</p></li>
+      <li><h3>Fase 4 · Interfaccia Quickshell</h3><div class="who"><span class="m s">Sonnet</span></div><p>Scheda, menu dalla barra, widget, modalità modifica. Si sviluppa senza cuffie con stati finti, e si verifica con screenshot.</p></li>
+      <li><h3>Fase 5 · Installazione</h3><div class="who"><span class="m s">Sonnet</span><span class="m u">Tu</span></div><p>Pacchetto Nix e modulo Home Manager come per oring; aggiungi tu l'input al flake di sistema; lista di controllo finale in 8 punti.</p></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="dc">
+    <h2 id="dc">Decisioni che spettano a te</h2>
+    <div class="dec">
+      <div><b>D1</b><span>Modello 3D: comprarlo, gratis o su misura? <em>Proposta: comprarlo.</em></span></div>
+      <div><b>D2</b><span>Licenza: GPL-3.0 (si può riusare il codice di LibrePods) o MIT? <em>Proposta: GPL-3.0.</em></span></div>
+      <div><b>D3</b><span>Connessione automatica: quando metti le cuffie, appena apri il coperchio, o mai? <em>Proposta: quando le metti.</em></span></div>
+      <div><b>D4</b><span>Lingua dell'interfaccia: inglese o italiano? <em>Proposta: inglese, come i mockup.</em></span></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const stage=$('stage'), outer=$('outer');
+  const W=1100,H=620;
+  function fit(){const s=outer.clientWidth/W;stage.style.transform='scale('+s+')';outer.style.height=(H*s)+'px';stage.dataset.s=s}
+  try{new ResizeObserver(fit).observe(outer)}catch(e){window.addEventListener('resize',fit)}
+  fit();
+
+  const bat={l:82,r:80,c:64,cc:true};
+  function ring(size,stroke,pct,glyph,label,charging){
+    const r=(size-stroke)/2, col=pct<=20?'var(--red)':'var(--grn)';
+    const g=glyph==='case'?'<svg width="'+(size*.5)+'" height="'+(size*.42)+'"><use href="#caseSmall"/></svg>'
+      :glyph==='pods'?'<svg width="'+(size*.52)+'" height="'+(size*.46)+'"><use href="#podsPair"/></svg>'
+      :'<svg width="'+(size*.36)+'" height="'+(size*.46)+'" '+(glyph==='r'?'style="transform:scaleX(-1)"':'')+'><use href="#pod"/></svg>';
+    return '<div class="ring"><div class="rsvg" style="width:'+size+'px;height:'+size+'px">'+
+      '<svg class="arc" width="'+size+'" height="'+size+'"><circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="var(--fill)" stroke-width="'+stroke+'"/>'+
+      '<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="'+col+'" stroke-width="'+stroke+'" stroke-linecap="round" pathLength="100" stroke-dasharray="'+pct+' 100"/></svg>'+
+      '<span class="glyph">'+g+'</span></div>'+
+      '<div class="pct">'+pct+'%'+(charging?'<svg width="9" height="13" style="color:var(--grn)"><use href="#bolt"/></svg>':'')+'</div>'+
+      (label?'<div class="lbl">'+label+'</div>':'')+'</div>';
+  }
+  function cardRings(){
+    const merged=Math.abs(bat.l-bat.r)<=10;
+    return '<div class="rings">'+(merged?ring(52,5,Math.min(bat.l,bat.r),'pods','AirPods')
+      :ring(52,5,bat.l,'l','Left')+ring(52,5,bat.r,'r','Right'))+ring(52,5,bat.c,'case','Case',bat.cc)+'</div>';
+  }
+  $('popRings').outerHTML='<div class="rings" id="popRings" style="gap:36px">'+ring(40,4,bat.l,'l','Left')+ring(40,4,bat.r,'r','Right')+ring(40,4,bat.c,'case','Case',bat.cc)+'</div>';
+  $('widget').innerHTML=ring(60,6,bat.l,'l','Left')+ring(60,6,bat.r,'r','Right')+ring(60,6,bat.c,'case','Case',bat.cc);
+
+  // layout state (logical px, top-left of card) shared with edit mode
+  const DEF={card:{x:370,y:186},widget:{x:24,y:436}};
+  let pos=JSON.parse(JSON.stringify(DEF)), draft=null;
+  function place(){
+    $('card').style.left=pos.card.x+'px';$('card').style.top=pos.card.y+'px';
+    $('widget').style.left=pos.widget.x+'px';$('widget').style.top=pos.widget.y+'px';$('widget').style.bottom='auto';
+  }
+
+  const captions={
+    lid:['<b>Coperchio aperto, non connesse.</b> La scheda sale dal basso con l\'animazione 3D del cofanetto.','Tocca Connect.'],
+    connecting:['<b>Connessione in corso.</b> Il PC chiede a BlueZ di collegare l\'audio.','Di solito 2–5 secondi.'],
+    connected:['<b>Connesse.</b> Batterie precise. Se le due cuffie differiscono di più del 10% compaiono separate.','L\'icona appare nel tray.'],
+    popover:['<b>Menu dalla barra.</b> Clic sull\'icona nel tray: batterie, modalità rumore, Conversation Awareness.','Prova i pulsanti.'],
+    widget:['<b>Widget batterie</b> sul desktop, sotto le finestre. Facoltativo.','Come il widget Batterie di iPhone.'],
+    edit:['<b>Modifica posizione.</b> Trascina scheda e widget; si agganciano al centro e ai bordi.','Done salva la posizione.']
+  };
+  let scene='lid', mode='anc', t=null;
+  function setScene(s){
+    scene=s; clearTimeout(t);
+    document.querySelectorAll('[data-scene]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.scene===s));
+    const card=$('card'), cb=$('cardBottom');
+    const showCard=['lid','connecting','connected'].includes(s);
+    card.classList.toggle('hide',!showCard);
+    if(s==='lid') cb.innerHTML='<button class="cta" id="connectBtn">Connect</button>';
+    if(s==='connecting') cb.innerHTML='<div class="cta busy"><span class="spin"></span>Connecting…</div>';
+    if(s==='connected') cb.innerHTML=cardRings();
+    const conn=s!=='lid'&&s!=='connecting';
+    $('trayPods').hidden=!conn;
+    $('trayPods').classList.toggle('active',s==='popover');
+    $('pop').classList.toggle('hide',s!=='popover');
+    $('widget').classList.toggle('hide',!(s==='widget'||s==='edit'));
+    $('edit').classList.toggle('hide',s!=='edit');
+    if(s==='edit'){draft=JSON.parse(JSON.stringify(pos));placeGhosts()}
+    const c=captions[s]; $('caption').innerHTML='<span>'+c[0]+'</span><span>'+c[1]+'</span>';
+    const btn=$('connectBtn'); if(btn) btn.onclick=()=>{setScene('connecting');t=setTimeout(()=>setScene('connected'),1600)};
+  }
+  document.querySelectorAll('[data-scene]').forEach(b=>b.onclick=()=>setScene(b.dataset.scene));
+  document.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{stage.dataset.w=b.dataset.w;document.querySelectorAll('[data-w]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+  $('cardX').onclick=()=>$('card').classList.add('hide');
+  $('trayPods').onclick=()=>setScene(scene==='popover'?'connected':'popover');
+  $('disc').onclick=()=>setScene('lid');
+  function setMode(m){mode=m;document.querySelectorAll('.mode').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m));$('adSlider').hidden=m!=='ad'}
+  document.querySelectorAll('.mode').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+  $('caSw').onclick=e=>{const el=e.currentTarget;el.setAttribute('aria-checked',el.getAttribute('aria-checked')!=='true')};
+
+  // edit mode dragging with snapping
+  const SNAP=12, M=24, TOP=46;
+  function placeGhosts(){
+    $('ghostCard').style.left=draft.card.x+'px';$('ghostCard').style.top=draft.card.y+'px';
+    $('ghostWidget').style.left=draft.widget.x+'px';$('ghostWidget').style.top=draft.widget.y+'px';
+  }
+  function drag(el,key,w,h){
+    let sx,sy,ox,oy,on=false;
+    el.addEventListener('pointerdown',e=>{on=true;el.setPointerCapture(e.pointerId);sx=e.clientX;sy=e.clientY;ox=draft[key].x;oy=draft[key].y});
+    el.addEventListener('pointermove',e=>{
+      if(!on)return; const s=+stage.dataset.s||1;
+      let x=ox+(e.clientX-sx)/s, y=oy+(e.clientY-sy)/s;
+      x=Math.round(x/8)*8; y=Math.round(y/8)*8;
+      let gv=false,gh=false;
+      if(Math.abs(x+w/2-W/2)<SNAP){x=W/2-w/2;gv=true}
+      if(Math.abs(y+h/2-H/2)<SNAP){y=H/2-h/2;gh=true}
+      if(Math.abs(x-M)<SNAP)x=M; if(Math.abs(x+w-(W-M))<SNAP)x=W-M-w;
+      if(Math.abs(y+h-(H-M))<SNAP)y=H-M-h; if(y<TOP+8)y=TOP+8;
+      x=Math.max(0,Math.min(W-w,x)); y=Math.min(H-h,y);
+      draft[key]={x,y}; placeGhosts();
+      $('gv').classList.toggle('on',gv); $('gh').classList.toggle('on',gh);
+    });
+    const end=()=>{on=false;$('gv').classList.remove('on');$('gh').classList.remove('on')};
+    el.addEventListener('pointerup',end); el.addEventListener('pointercancel',end);
+  }
+  drag($('ghostCard'),'card',360,410); drag($('ghostWidget'),'widget',340,160);
+  $('eReset').onclick=()=>{draft=JSON.parse(JSON.stringify(DEF));placeGhosts()};
+  $('eCancel').onclick=()=>setScene('connected');
+  $('eDone').onclick=()=>{pos=draft;place();setScene('lid')};
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&scene==='edit')setScene('connected')});
+
+  // clock
+  function tick(){const d=new Date();$('clock').textContent=d.toTimeString().slice(0,8)}
+  tick(); setInterval(tick,1000);
+
+  place(); setScene('lid'); setMode('anc');
+})();
+</script>
