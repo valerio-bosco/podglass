@@ -16,15 +16,17 @@ import bpy
 from mathutils import Vector
 
 # ---- dimensions (cm) --------------------------------------------------------------------------
-W, D, H = 6.2, 2.17, 4.35          # case width (X), depth (Y), height (Z): a bit wider and lower than 60.6 x 45.2
+W, D, H = 6.0, 2.2, 4.5            # case width (X), depth (Y), height (Z); measured from the photos: 60 x 45 x 22 mm
 LID_H = H / 3                       # the seam is one third from the top: SEAM = H - LID_H
 SEAM = H - LID_H
-N_FRONT, N_PLAN = 5.0, 3.4          # superellipse exponents: front view (x/z) and plan (x/y); 2 = ellipse, inf = box
+N_FRONT, N_PLAN = 4.2, 3.2          # superellipse exponents: front view (x/z) and plan (x/y); 2 = ellipse, inf = box
 DOME = 0.07                         # the flat top and bottom faces bulge by this much
 WALL = 0.1                          # lid wall thickness
-POD_X = 1.45                        # pod centers at +-POD_X
-POD_RISE = 0.1                      # head center sits this far ABOVE the seam (heads rise out of the cavities)
-CAVITY_R = 0.95
+POD_X = 1.6                        # pod centers at +-POD_X
+POD_RISE = 0.4                      # head center sits this far ABOVE the seam (heads rise out of the cavities)
+CAVITY_R = 1.0
+STEM_OFF = 0.36                     # the stem axis sits this far outwards of the head axis (photo 241)
+LED_DROP = 0.83                     # status light below the seam (photo 249: 18% of the case height)
 HINGE_Y = D / 2 - 0.06              # hinge axis (y, z = SEAM): on the back surface, so the lid does not dig into the base
 
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -213,10 +215,10 @@ def material(name, color, rough=0.3, metal=0.0, coat=0.0, coat_rough=0.05, emiss
 def make_materials():
     return {
         "white": material("White gloss", (0.95, 0.94, 0.91), rough=0.13, coat=1.0, coat_rough=0.015, spec=0.6),
-        "white_rough": material("White inside", (0.92, 0.91, 0.88), rough=0.22, coat=0.5, coat_rough=0.05),
-        "grey_tip": material("Silicone tip", (0.42, 0.43, 0.44), rough=0.4, sss=(0.35, (0.8, 0.82, 0.85))),
+        "white_rough": material("White inside", (0.92, 0.91, 0.88), rough=0.35, coat=0.0),
+        "grey_tip": material("Silicone tip", (0.82, 0.77, 0.6), rough=0.4, sss=(0.35, (0.8, 0.82, 0.85))),
         "mesh": material("Mesh", (0.03, 0.03, 0.034), rough=0.6, bump=(420.0, 0.9)),
-        "steel": material("Steel", (0.78, 0.78, 0.8), rough=0.14, metal=1.0),
+        "steel": material("Steel", (0.82, 0.82, 0.83), rough=0.28, metal=1.0),
         "dark": material("Dark", (0.01, 0.01, 0.012), rough=0.5),
         "led": material("LED", (0.6, 1.0, 0.55), rough=0.4, emission=((0.6, 1.0, 0.55), 6.0)),
     }
@@ -237,70 +239,103 @@ def build_case(mats):
 
     def shell(name):
         ob = superell(name, W / 2, D / 2, H / 2, center=(0, 0, H / 2))
-        # hinge notch at the back
-        boolean(ob, rbox("notch", 2.4, 0.5, 0.5, 0.0, segs=1, center=(0, HINGE_Y, SEAM)))
+        # hinge notch at the back (the steel plate sits in it)
+        boolean(ob, rbox("notch", 3.2, 0.3, 0.9, 0.0, segs=1, center=(0, HINGE_Y + 0.1, SEAM)))
         return ob
 
     # ---- base
     base = shell("Case_Base")
     boolean(base, rbox("keep", W * 2, D * 2, SEAM - gap + 5, 0.0, segs=1, center=(0, 0, (SEAM - gap - 5) / 2)), "INTERSECT")
-    boolean(base, rbox("pocket", 0.6, 0.62, 0.74, 0.12, segs=4, center=(W / 2, 0.0, 0.95)))
-    boolean(base, rbox("port", 0.86, 0.2, 1.0, 0.09, segs=4, center=(-0.5, 0.0, 0.0)))
-    for row in (-1, 1):
-        for i in range(7):
-            boolean(base, cyl("hole", 0.045, 1.0, (0.55 + i * 0.2, row * 0.11, 0.0), verts=12))
-    boolean(base, cyl("ledcut", 0.085, 0.1, (0, -D / 2, SEAM - 0.55), rot=(math.pi / 2, 0, 0), verts=24))
-    for sx in (-1, 1):  # pod cavities: deep cups for the stem, wider for the head, flared at the rim
-        prof = [(0, SEAM - 2.12), (0.45, SEAM - 2.12), (0.62, SEAM - 1.8), (0.64, SEAM - 1.2),
-                (0.8, SEAM - 0.75), (CAVITY_R - 0.03, SEAM - 0.35), (CAVITY_R, SEAM - 0.1),
-                (CAVITY_R + 0.1, SEAM + 0.02), (CAVITY_R + 0.1, SEAM + 0.3), (0, SEAM + 0.3)]
+    # lanyard slot in the right end (photo 246): stadium 1.0 (z) x 0.46 (y), dark inside
+    boolean(base, rbox("pocket", 0.7, 0.46, 1.0, 0.22, segs=6, center=(W / 2, 0.0, SEAM - 0.91)))
+    # Lightning slot (photo 247): centered, 1.0 x 0.3, rounded ends; speaker holes 3 left + 1 right of it
+    boolean(base, rbox("port", 1.0, 0.3, 1.0, 0.14, segs=6, center=(0.0, 0.0, 0.0)))
+    for hx in (-2.04, -1.79, -1.54, 1.57):
+        boolean(base, cyl("hole", 0.07, 1.0, (hx, 0.0, 0.0), verts=12))
+    boolean(base, cyl("ledcut", 0.06, 0.1, (0, -D / 2, SEAM - LED_DROP), rot=(math.pi / 2, 0, 0), verts=24))
+    # thumb notch on the front (photo 249/243): stadium about half the width, straddling the seam
+    boolean(base, rbox("thumb", 2.9, 0.44, 0.4, 0.17, segs=6, center=(0, -D / 2 + 0.07, SEAM - 0.12)))
+    for sx in (-1, 1):  # pod cavities: bowl for the head, offset slim cup for the stem
+        prof = [(0, SEAM - 1.25), (0.55, SEAM - 1.2), (0.86, SEAM - 0.85), (CAVITY_R - 0.04, SEAM - 0.35),
+                (CAVITY_R, SEAM - 0.1), (CAVITY_R + 0.1, SEAM + 0.02), (CAVITY_R + 0.1, SEAM + 0.3), (0, SEAM + 0.3)]
         c = lathe("cav", prof, steps=64)
+        c.scale = (1.0, 0.82, 1.0)
         c.location = (sx * POD_X, 0, 0)
         boolean(base, c)
+        sp = [(0, SEAM - 2.3), (0.34, SEAM - 2.28), (0.5, SEAM - 2.1), (0.5, SEAM - 0.8), (0, SEAM - 0.8)]
+        c = lathe("cavs", sp, steps=40)
+        c.scale = (1.0, 0.85, 1.0)
+        c.location = (sx * (POD_X + STEM_OFF), 0, 0)
+        boolean(base, c)
+    boolean(base, rbox("trough", 3.0, 1.3, 1.4, 0.2, segs=5, center=(0, 0, SEAM - 0.5)))  # where the tips lie
     bevel(base, 0.1, 2, angle=35)
     smooth(base, 35, weighted=True)
 
-    # ---- lid (origin later moved to the hinge axis)
+    # ---- lid (origin later moved to the hinge axis): solid with two bowls for the pod heads
     lid = shell("Case_Lid")
     boolean(lid, rbox("keep", W * 2, D * 2, LID_H * 2, 0.0, segs=1, center=(0, 0, H - LID_H + gap + LID_H)), "INTERSECT")
-    inset = WALL
-    boolean(lid, superell("hollow", W / 2 - inset, D / 2 - inset, H / 2 - inset, center=(0, 0, H / 2), dome=DOME - 0.02))
+    for sx in (-1, 1):
+        prof = [(0, SEAM + 1.42), (0.5, SEAM + 1.37), (0.88, SEAM + 1.05), (1.08, SEAM + 0.4), (1.14, SEAM - 0.1), (0, SEAM - 0.1)]
+        c = lathe("bowl", prof, steps=64)
+        c.scale = (1.0, 0.78, 1.0)
+        c.location = (sx * POD_X, 0, 0)
+        boolean(lid, c)
     bevel(lid, 0.1, 2, angle=35)
     smooth(lid, 35, weighted=True)
 
     # materials
     def base_pick(p):
         c, n = p.center, p.normal
-        inside = c.z > SEAM - 2.2 and (n.z > 0.6 or math.hypot(abs(c.x) - POD_X, c.y) < CAVITY_R + 0.15)
-        if c.z < 0.9 and abs(c.y) < 0.3 and (-1.0 < c.x < 0.0 or 0.4 < c.x < 2.2) and c.z > 0.02:
+        if c.z < 0.9 and abs(c.y) < 0.3 and c.z > 0.02 and (abs(c.x) < 0.6 or abs(abs(c.x) - 1.8) < 0.5):
             return 2  # port and speaker holes
+        if W / 2 - 0.5 < c.x < W / 2 - 0.08 and abs(c.y) < 0.3 and SEAM - 1.5 < c.z < SEAM - 0.3:
+            return 2  # lanyard slot
+        d0 = math.hypot(abs(c.x) - POD_X, c.y)
+        d1 = math.hypot(abs(c.x) - POD_X - STEM_OFF, c.y)
+        inside = c.z > SEAM - 2.6 and (d0 < 1.3 or d1 < 0.62 or (abs(c.x) < 1.7 and abs(c.y) < 0.75 and c.z > SEAM - 1.3)
+                                      or (n.z > 0.6 and c.z > SEAM - 0.2))
         return 1 if inside else 0
     assign(base, mats, ["white", "white_rough", "dark"], base_pick)
 
     def lid_pick(p):
         c, n = p.center, p.normal
-        inner = n.z < -0.3 or (abs(c.x) < W / 2 - inset - 0.05 and abs(c.y) < D / 2 - inset - 0.05
-                               and c.z < H - 0.16 and c.z > SEAM + 0.3 and abs(n.z) < 0.99 and False)
-        return 1 if inner else 0
+        d0 = math.hypot(abs(c.x) - POD_X, c.y)
+        return 1 if (c.z < SEAM + 1.4 and (n.z < -0.3 or d0 < 1.3) and c.z < H - 0.2) else 0
     assign(lid, mats, ["white", "white_rough"], lid_pick)
     return base, lid
 
 
 def build_hardware(mats, lid):
-    hinge = cyl("Case_Hinge", 0.1, 2.3, (0, HINGE_Y, SEAM), rot=(0, math.pi / 2, 0), verts=40)
-    bevel(hinge, 0.02, 2, angle=40)
+    # steel hinge plate on the back (photo 248): about half the width, 0.7 high, straddling the seam, two small slits
+    hinge = rbox("Case_Hinge", 3.0, 0.12, 0.7, 0.03, segs=2, center=(0, D / 2 - 0.045, SEAM + 0.15))
     smooth(hinge, 40)
     hinge.data.materials.append(mats["steel"])
 
-    led = cyl("Case_LED", 0.07, 0.03, (0, -D / 2 + 0.01, SEAM - 0.55), rot=(math.pi / 2, 0, 0), verts=24)
+    led = cyl("Case_LED", 0.06, 0.03, (0, -D / 2 + 0.01, SEAM - LED_DROP), rot=(math.pi / 2, 0, 0), verts=24)
     led.data.materials.append(mats["led"])
 
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.2, minor_radius=0.04, major_segments=40, minor_segments=14,
-                                     location=(W / 2 - 0.2, 0.0, 0.92), rotation=(math.pi / 2, 0, 0))
-    loop = bpy.context.active_object
+    # pairing button: a thin engraved ring on the back, 0.8 wide, 1.5 below the seam (photo 248)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.39, minor_radius=0.012, major_segments=48, minor_segments=8,
+                                     location=(0, D / 2 - 0.004, SEAM - 1.5), rotation=(math.pi / 2, 0, 0))
+    btn = bpy.context.active_object
+    btn.name = "Case_Button"
+    btn.data.materials.append(mats["dark"])
+    bpy.ops.object.shade_smooth()
+
+    # lanyard loop (photo 246): two steel eyes in the dark slot of the right end
+    eyes = []
+    for dz in (-0.27, 0.27):
+        e = cyl("eye", 0.19, 0.1, (W / 2 - 0.12, 0.0, SEAM - 0.91 + dz), rot=(0, math.pi / 2, 0), verts=24)
+        eyes.append(e)
+    loop = eyes[0]
+    bpy.ops.object.select_all(action="DESELECT")
+    for e in eyes:
+        e.select_set(True)
+    bpy.context.view_layer.objects.active = loop
+    bpy.ops.object.join()
     loop.name = "Case_Loop"
     loop.data.materials.append(mats["steel"])
-    bpy.ops.object.shade_smooth()
+    smooth(loop, 40)
 
     # move lid origin to the hinge axis
     bpy.context.scene.cursor.location = (0, HINGE_Y, SEAM)
@@ -310,58 +345,74 @@ def build_hardware(mats, lid):
 
 
 # ---- pods ------------------------------------------------------------------------------------
-IN_CASE_TILT = 20.0  # degrees, tips lean towards the case center while the pods sit in the case
-TIP_TILT = 0.0  # tips are built along +z; the 'TipRig' empty tilts them (render.py sets the angle per shot)
+TIP_TILT = 105.0  # degrees from the stem axis (up) towards the tip direction: ~20 below horizontal (photo 241)
 
 
 def build_pod(name, mats):
     root = bpy.data.objects.new(name, None)
     bpy.context.scene.collection.objects.link(root)
-    side = 1 if name.endswith("_L") else -1   # tips lean towards the case center
+    sgn = 1 if name.endswith("_L") else -1    # tip direction (+x for the left pod, towards the case center)
 
-    # head: body of revolution around the stem axis (z)
-    hprof = [(0.0, -0.95), (0.3, -0.93), (0.55, -0.8), (0.76, -0.52), (0.87, -0.1), (0.86, 0.3),
-             (0.7, 0.65), (0.4, 0.86), (0.0, 0.9)]
+    # head: egg of revolution around the vertical axis, origin at its center
+    hprof = [(0.0, -0.92), (0.45, -0.88), (0.78, -0.6), (0.86, -0.3), (0.88, 0.05), (0.84, 0.4),
+             (0.66, 0.72), (0.36, 0.9), (0.0, 0.95)]
     head = lathe(name + "_Head", hprof, steps=56)
-    head.scale = (1.0, 0.96, 1.0)
+    head.scale = (1.0, 0.95, 1.0)
     head.data.materials.append(mats["white"])
     head.parent = root
 
-    # stem: flattened (thin in y), ends inside the head
-    sprof = [(0.0, -2.26), (0.17, -2.25), (0.27, -2.18), (0.31, -2.0), (0.34, -1.5), (0.38, -1.1),
-             (0.46, -0.8), (0.5, -0.6), (0.0, -0.6)]
+    # stem: slightly flat in y, offset outwards so its outer edge runs on into the head silhouette
+    sprof = [(0.0, -2.55), (0.3, -2.54), (0.35, -2.46), (0.37, -2.3), (0.41, -1.6), (0.45, -1.0),
+             (0.46, -0.6), (0.47, -0.3), (0.0, -0.3)]
     stem = lathe(name + "_Stem", sprof, steps=40)
-    stem.scale = (1.0, 0.72, 1.0)
+    stem.scale = (1.0, 0.85, 1.0)
+    stem.location = (-sgn * STEM_OFF, 0, 0)
     stem.data.materials.append(mats["white"])
     stem.parent = root
 
-    # silicone tip: neck + dome, built along +z; the TipRig empty tilts it about y
-    k = 0.88
-    tprof = [(r, z * (k if z > 0.4 else 1.0)) for r, z in [(0.0, 0.4), (0.46, 0.4), (0.47, 0.95), (0.58, 1.05),
-             (0.67, 1.2), (0.66, 1.38), (0.57, 1.52), (0.45, 1.58), (0.39, 1.58), (0.38, 1.5), (0.0, 1.5)]]
+    # silicone tip: built along +z, the TipRig empty tilts it about y (render.py sets the angle per shot)
     rig = bpy.data.objects.new(name + "_TipRig", None)
     bpy.context.scene.collection.objects.link(rig)
     rig.parent = root
-    rig.rotation_euler = (0, side * math.radians(IN_CASE_TILT), 0)
+    rig.location = (sgn * 0.55, 0, -0.35)
+    rig.rotation_euler = (0, sgn * math.radians(TIP_TILT), 0)
+    tprof = [(0.0, 0.0), (0.5, 0.0), (0.58, 0.2), (0.57, 0.45), (0.53, 0.65), (0.48, 0.8), (0.43, 0.88),
+             (0.37, 0.88), (0.34, 0.82), (0.0, 0.82)]
     tip = lathe(name + "_Tip", tprof, steps=56)
     tip.data.materials.append(mats["grey_tip"])
     tip.parent = rig
-
-    # black mesh disc in the tip opening
-    mesh = cyl(name + "_Mesh", 0.37, 0.02, (0, 0, 1.505 * k), verts=40)
+    mesh = cyl(name + "_Mesh", 0.33, 0.02, (0, 0, 0.83), verts=40)
     mesh.data.materials.append(mats["mesh"])
     mesh.parent = rig
 
-    # mic hole on the head, dark mic mesh and steel contacts on the stem, pressure sensor flat (front, -y)
-    d = cyl(name + "_Vent", 0.1, 0.02, (0, -0.8 * 0.96, -0.55), rot=(math.pi / 2 + 0.55, 0, 0), verts=20)
-    d.data.materials.append(mats["mesh"])
-    d.parent = root
-    for sx in (-0.07, 0.07):
-        c = cyl(f"{name}_Contact", 0.045, 0.02, (sx, 0, -2.255), verts=12)
-        c.data.materials.append(mats["steel"])
-        c.parent = root
-    for nm, z, sc, mat in (("Mic", -2.0, (0.09, 0.04, 0.13), "mesh"), ("Sensor", -1.35, (0.05, 0.03, 0.38), "white_rough")):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(0, -0.215, z))
+    # microphone slot on the head (black, elongated), facing front-up like in photos 243/239
+    n = Vector((-sgn * 0.25, -0.68, 0.68)).normalized()
+    org = n * 3.0
+    ok, hit, _nn, _i = head.ray_cast(Vector((org.x, org.y / 0.95, org.z)), -n)
+    pos = Vector((hit.x, hit.y * 0.95, hit.z)) - n * 0.01 if ok else n * 0.85
+    lng = Vector((sgn * 0.5, 0, -1.0))
+    lng = (lng - n * lng.dot(n)).normalized()
+    side_v = lng.cross(n).normalized()
+    from mathutils import Matrix
+    rot = Matrix((side_v, lng, n)).transposed()
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=pos)
+    slot = bpy.context.active_object
+    slot.name = name + "_Slot"
+    slot.rotation_euler = rot.to_euler()
+    slot.scale = (0.1, 0.26, 0.07)
+    slot.data.materials.append(mats["dark"])
+    bpy.ops.object.shade_smooth()
+    slot.parent = root
+
+    # steel contact band at the stem end, microphone dot and force-sensor flat on the stem front (-y)
+    sx0 = -sgn * STEM_OFF
+    band = cyl(name + "_Band", 0.345, 0.1, (sx0, 0, -2.5), verts=32)
+    band.scale = (1.0, 0.85, 1.0)
+    band.data.materials.append(mats["steel"])
+    smooth(band, 40)
+    band.parent = root
+    for nm, z, sc, mat, yy in (("Mic", -2.15, (0.07, 0.03, 0.1), "dark", -0.275), ("Sensor", -1.4, (0.05, 0.03, 0.4), "white_rough", -0.33)):
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(sx0, yy, z))
         o = bpy.context.active_object
         o.name = f"{name}_{nm}"
         o.scale = sc

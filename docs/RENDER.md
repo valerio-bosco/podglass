@@ -49,16 +49,28 @@ All have a transparent background; the floor shadow of the case shots is baked i
 
 ## The model (`model.py`)
 
-Units: 1 unit = 1 cm. Case 6.2 x 2.17 x 4.35 (W x D x H; a superellipsoid, squircle in plan and front view, slightly domed flat faces, seam one third from the top), standing on z = 0,
-hinge on the back surface at the seam (+Y, no overlap when open), camera in front (-Y). Objects: `Case_Base`, `Case_Lid` (origin on the hinge axis,
-open it by rotating about X by a negative angle), `Case_Hinge` (steel barrel in a notch), `Case_LED`
-(emissive), `Case_Loop` (lanyard ring in a pocket on the right side), `Pod_L`/`Pod_R` (empties; children
-body+stem, `_TipRig` > silicone tip and black mesh, vents, steel contacts, stem sensor flat). The bottom
-has a Lightning slot and a speaker grille (not visible in the shots, but modelled).
-Materials: glossy warm white (roughness 0.13, full clearcoat), slightly rougher white inside, light grey translucent silicone tip (subsurface), dark grey fine mesh (bump pattern),
-polished steel. Shapes are bevelled boxes / surfaces of revolution with weighted normals, no low-poly look.
+Units: 1 unit = 1 cm. Proportions come from the user's own photos of the case (straight-on front, ends, bottom):
+case 6.0 x 2.2 x 4.5 (W x D x H; a superellipsoid, rounded rectangle in front view, pill-shaped end profile,
+slightly domed flat faces), seam one third from the top, standing on z = 0, hinge on the back at the seam
+(+Y, no overlap when open), camera in front (-Y). Objects: `Case_Base`, `Case_Lid` (solid with two bowls for the
+pod heads; origin on the hinge axis, open it by rotating about X by a negative angle), `Case_Hinge` (steel plate on
+the back, about half the width), `Case_LED` (emissive, 0.83 cm below the seam), `Case_Button` (pairing ring on the
+back), `Case_Loop` (two steel eyes in a dark slot on the right end, 0.9 cm below the seam), `Pod_L`/`Pod_R` (empties,
+origin = head center; children: head, stem (offset outwards), `_TipRig` > silicone tip and black mesh, slot, steel
+band, mic dot, force-sensor flat). Pod proportions from the profile photo: head 1.76 wide, stem 0.8 wide and 2.5 below
+the head center, tip 1.1 wide, pointing sideways and 15 degrees down (`tip_tilt = 105` degrees from the stem axis).
+The case has a thumb notch on the front at the seam, a Lightning slot (the user's case is Lightning, not USB-C: thin
+stadium slot with pins) centered on the bottom, three speaker holes on its left and one on its right, and two shared
+cavities per pod (head bowl, offset stem cup) plus a trough for the tips.
+Materials: glossy white (roughness 0.13, full clearcoat), matte white inside, warm cream silicone tip (subsurface),
+dark grey fine mesh (bump pattern), polished steel. Shapes are bevelled boxes / surfaces of revolution with weighted
+normals, no low-poly look.
 
-Constants at the top of `model.py` (case size, rounding `EDGE`, lid height `LID_H`, pod rise above the seam `POD_RISE` (heads and stem tops stand out of the cavities, tips lean about 50 degrees inward) (tips lean toward the center), cavity radius) are the first things to tweak.
+Photo-matching debug shots (skipped by `all`): `debug-front` (photo 249), `debug-end` (246), `debug-photo243`
+(open, three-quarter), `debug-photo247` (bottom), `debug-photo248` (back), `debug-pod` (profile like 241).
+
+Constants at the top of `model.py` (case size, `LID_H`, `POD_X`, `POD_RISE`, `STEM_OFF`, `LED_DROP`)
+are the first things to tweak.
 
 ## What to tweak (`shots.toml`)
 

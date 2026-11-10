@@ -21,7 +21,7 @@ azimuth = -24.0        # degrees from the front towards +X (3/4 view)
 elevation = 15.0
 target = [0.0, 0.0, 2.7]
 frame_width = 8.4
-tip_tilt = 50.0        # degrees the silicone tips lean towards the center while the pods are in the case      # cm visible across the image at the target distance
+tip_tilt = 105.0       # degrees the silicone tips lean towards the center while the pods are in the case      # cm visible across the image at the target distance
 
 [light]                # area lights, positions relative to the target, in cm
 key   = { pos = [-14.0, -12.0, 16.0], size = 22.0, energy = 9000.0, color = [1.0, 0.98, 0.95] }
@@ -67,12 +67,11 @@ out = ["case-small.png", "case-small-44.png:44"]
 kind = "still"
 size = [240, 240]
 only = ["Pod_L"]
-place = { Pod_L = { loc = [0.0, 0.0, 2.3], rot = [0.0, 0.0, -35.0] } }
+place = { Pod_L = { loc = [0.0, 0.0, 2.6], rot = [0.0, 0.0, -20.0] } }
 azimuth = 0.0
 elevation = 6.0
-tip_tilt = 38.0
-target = [0.0, 0.0, 1.9]
-frame_width = 4.2
+target = [0.0, 0.0, 1.75]
+frame_width = 4.4
 shadow = false
 out = ["pod-left.png", "pod-left-44.png:44"]
 
@@ -80,12 +79,11 @@ out = ["pod-left.png", "pod-left-44.png:44"]
 kind = "still"
 size = [240, 240]
 only = ["Pod_R"]
-place = { Pod_R = { loc = [0.0, 0.0, 2.3], rot = [0.0, 0.0, 35.0] } }
+place = { Pod_R = { loc = [0.0, 0.0, 2.6], rot = [0.0, 0.0, 20.0] } }
 azimuth = 0.0
 elevation = 6.0
-tip_tilt = 38.0
-target = [0.0, 0.0, 1.9]
-frame_width = 4.2
+target = [0.0, 0.0, 1.75]
+frame_width = 4.4
 shadow = false
 out = ["pod-right.png", "pod-right-44.png:44"]
 
@@ -93,12 +91,11 @@ out = ["pod-right.png", "pod-right-44.png:44"]
 kind = "still"
 size = [176, 176]
 only = ["Pod_L", "Pod_R"]
-place = { Pod_L = { loc = [-1.5, 0.0, 2.3], rot = [0.0, 0.0, -30.0] }, Pod_R = { loc = [1.5, 0.0, 2.3], rot = [0.0, 0.0, 30.0] } }
+place = { Pod_L = { loc = [-1.5, 0.0, 2.6], rot = [0.0, 0.0, -20.0] }, Pod_R = { loc = [1.5, 0.0, 2.6], rot = [0.0, 0.0, 20.0] } }
 azimuth = 0.0
 elevation = 6.0
-tip_tilt = 38.0
-target = [0.0, 0.0, 1.9]
-frame_width = 5.6
+target = [0.0, 0.0, 1.75]
+frame_width = 5.8
 shadow = false
 out = ["pods-pair.png", "pods-pair-44.png:44"]
 
@@ -130,3 +127,76 @@ azimuth = 150.0
 elevation = 25.0
 shadow = false
 out = "debug-back.png"
+
+# Photo-matching debug views (same angle as the reference photos 249, 246, 243, 241).
+[shots.debug-front]
+kind = "still"
+debug = true
+size = [500, 400]
+lid = 0.0
+azimuth = 0.0
+elevation = 0.0
+target = [0.0, 0.0, 2.25]
+frame_width = 7.4
+shadow = false
+out = "debug-front.png"
+
+[shots.debug-end]
+kind = "still"
+debug = true
+size = [500, 400]
+lid = 0.0
+azimuth = 90.0
+elevation = 0.0
+target = [0.0, 0.0, 2.25]
+frame_width = 6.0
+shadow = false
+out = "debug-end.png"
+
+[shots.debug-photo243]
+kind = "still"
+debug = true
+size = [500, 500]
+lid = 1.0
+azimuth = 0.0
+elevation = 42.0
+target = [0.0, 0.0, 2.9]
+frame_width = 8.4
+out = "debug-photo243.png"
+
+[shots.debug-pod]
+kind = "still"
+debug = true
+size = [400, 500]
+only = ["Pod_L"]
+place = { Pod_L = { loc = [0.0, 0.0, 2.5], rot = [0.0, 0.0, 0.0] } }
+azimuth = 0.0
+elevation = 0.0
+target = [0.0, 0.0, 1.5]
+frame_width = 5.0
+shadow = false
+out = "debug-pod.png"
+
+[shots.debug-photo247]
+kind = "still"
+debug = true
+size = [500, 400]
+lid = 0.0
+azimuth = 0.0
+elevation = -82.0
+target = [0.0, 0.0, 0.0]
+frame_width = 7.0
+shadow = false
+out = "debug-photo247.png"
+
+[shots.debug-photo248]
+kind = "still"
+debug = true
+size = [500, 400]
+lid = 0.0
+azimuth = 180.0
+elevation = 0.0
+target = [0.0, 0.0, 2.25]
+frame_width = 7.4
+shadow = false
+out = "debug-photo248.png"
