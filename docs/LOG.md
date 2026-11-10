@@ -30,3 +30,7 @@ One entry per task: date, task id, model, what was done, what could not be verif
 - Not re-run in this session (low-cost close): screenshots are from the previous session.
 - Human check pending: compare docs/screens with the mockup page.
 - P4.5 EditMode left open: code exists but there is no screenshot or recorded test of drag/snap/save.
+
+## 2026-11-10 - Nix verification (Opus)
+- `nix develop -c pytest -q`: 149 passed (after adding `pythonpath = ["."]` to pyproject.toml).
+- `nix flake check`: all checks passed. Phase 1 is now verified with the real `cryptography`.
