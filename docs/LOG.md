@@ -48,3 +48,16 @@ One entry per task: date, task id, model, what was done, what could not be verif
   (nixos-rebuild did not restart bluetoothd).
 - `AdvertisementMonitorManager1` now exposed, monitor type `or_patterns`, adapter feature
   `HardwareOffload`. P0.1 done.
+
+## 2026-11-10 - P0.2, P0.3 tools (Opus)
+- `tools/capture_ble.py`: passive scan via BlueZ advertisement monitor works (or-pattern
+  `4c 00 07`). Smoke run: both pods advertise with different RPAs, model `pro2-lightning`
+  (adv id 0x1420, modalias p2014), coarse L50 R40 case 0, lid open, conn byte 4.
+- `tools/capture_aap.py`: L2CAP 0x1001 connect without root works; handshake, features and
+  notifications accepted. Got exact battery (L54 R44 case 1), Mode anc, Ear in-case/in-case,
+  AdaptiveLevel 50, Keys. Keys go to ~/.local/state/podglass/keys.json and are redacted in logs.
+- IRK from AAP resolves both captured RPAs with `resolve_rpa` (P1 byte-order question answered
+  in practice).
+- Unparsed opcodes seen at startup: 0x08, 0x0c, 0x0e, 0x17 (HID-like descriptors, contain the
+  serial number), 0x2e, 0x53, 0x55, control settings 0x1b/0x35/0x3e. Raw sessions are gitignored.
+- Pending: the user runs the labeled capture script (docs/SPIKE.md) - P0.2/P0.3 human checks.

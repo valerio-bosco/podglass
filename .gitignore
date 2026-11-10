@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 result
 .pytest_cache/
+tests/fixtures/aap/session-*.jsonl
