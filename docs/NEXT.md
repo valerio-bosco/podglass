@@ -25,6 +25,16 @@ docs/RENDER.md; renders go to assets/renders and ~/.local/share/podglass/renders
 When spawning parallel agents, create worktrees with `git worktree add` from this repo first
 (agent `isolation: worktree` uses the session's current directory, which may be another repo).
 
+## Blender MCP (2026-11-10)
+
+blender-mcp (github.com/ahujasid/blender-mcp, commit 2e4b0bc) is pinned in
+`~/.local/share/blender-mcp` with its python env; server wrapper `~/.local/bin/blender-mcp-server`
+(telemetry off). The user installs the addon in Blender (Install from Disk: addon.py, start server
+from the N panel "BlenderMCP" tab) and registers the server with
+`claude mcp add blender --scope user -- /home/voodoo/.local/bin/blender-mcp-server`, then restarts
+Claude Code. Model work: shape first by tracing the reference photos (docs/LOG.md rounds 3-6),
+quick viewport/workbench previews, Cycles only at the end, GPU only.
+
 ## Workstreams (done 2026-11-10; kept as reference)
 
 Each workstream owns its files. Do not edit files owned by another workstream, and do not edit
