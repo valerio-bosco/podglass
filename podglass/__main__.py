@@ -26,6 +26,38 @@ def _format_status(d: dict) -> str:
     ])
 
 
+def _run_ui() -> int:
+    """Replace this process with the Quickshell UI (the long-running `podglass-ui` service)."""
+    import os
+    import shutil
+    from pathlib import Path
+
+    root = Path(os.environ.get("PODGLASS_ROOT") or Path(__file__).resolve().parent.parent)
+    shell = root / "ui" / "shell.qml"
+    quickshell = os.environ.get("PODGLASS_QUICKSHELL") or shutil.which("quickshell")
+    if not shell.is_file() or not quickshell:
+        print(f"cannot start the UI: {'quickshell not found' if not quickshell else shell + ' missing'}",
+              file=sys.stderr)
+        return 1
+    env = dict(os.environ, PODGLASS_ROOT=str(root))
+    env.setdefault("PODGLASS_BIN", shutil.which("podglass") or sys.argv[0])
+    # Renders are generated per user (never in the store): when the package has none, build a
+    # small root whose assets/renders points at $XDG_DATA_HOME/podglass/renders.
+    data = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "podglass" / "renders"
+    if not (root / "assets" / "renders" / "manifest.json").exists() and (data / "manifest.json").exists():
+        overlay = Path(os.environ.get("XDG_RUNTIME_DIR") or "/tmp") / "podglass-ui-root"
+        (overlay / "assets").mkdir(parents=True, exist_ok=True)
+        for link, target in ((overlay / "tools", root / "tools"),
+                             (overlay / "assets" / "placeholder", root / "assets" / "placeholder"),
+                             (overlay / "assets" / "renders", data)):
+            if link.is_symlink() and Path(os.readlink(link)) != target:
+                link.unlink()
+            if not link.is_symlink():
+                link.symlink_to(target)
+        env["PODGLASS_ROOT"] = str(overlay)
+    os.execve(quickshell, [quickshell, "-p", str(shell)], env)
+
+
 def _client(coro) -> int:
     from .ipc import socket_path
 
@@ -51,6 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("set", help="send a command: connect, disconnect, mode <m>, ca <on|off>, ...")
     s.add_argument("verb")
     s.add_argument("arg", nargs="?")
+    sub.add_parser("ui", help="run the Quickshell UI (card, popover, widget)")
     for verb, text in UI_VERBS.items():
         sub.add_parser(verb, help=text)
 
@@ -81,6 +114,8 @@ def main(argv: list[str] | None = None) -> int:
         from .daemon import main as daemon_main
 
         return daemon_main(Path(args.replay) if args.replay else None, args.verbose)
+    if args.cmd == "ui":
+        return _run_ui()
     if args.cmd == "watch":
         return _client(ipc.watch(out=lambda line: print(line, flush=True)))
     if args.cmd == "status":
