@@ -157,3 +157,16 @@ One entry per task: date, task id, model, what was done, what could not be verif
   layout.json, Cancel, Esc, card at the saved place). Not verified: mouse drag, 8 px grid, snap
   guides, widget ghost (no way to hold a mouse button from the agent). P4.5 stays open for the user.
 - 184 tests pass on master.
+
+## 2026-11-10 - workstream W3 merged: model and renders (agent on Sonnet)
+- `tools/render/model.py` builds the Pro 2 Lightning case + pods procedurally (25k polygons),
+  `render.py` + `shots.toml` render every file of UI.md plus `manifest.json`; docs/RENDER.md.
+- GPU only (user decision): CUDA Blender from cache.nixos-cuda.org in `devShells.render` (plus
+  nvcc/cudart/cccl/gcc: Pascal has no prebuilt Cycles kernels, compiled once ~3 min). `--device
+  auto` errors instead of falling back to the CPU; 2 host threads.
+- Speed on one 560x460 still: 8.7 s default -> 4.5 s tuned (64 samples adaptive, OptiX denoiser
+  albedo only, fewer bounces, persistent data). Full set 754 s.
+- Renders copied to `assets/renders/` (live temp UI) and `~/.local/share/podglass/renders/`
+  (packaged UI). P3.0 has a first scripted version; P3.2 (user look approval) open. Agent's list of
+  differences: flat matte white, pods sit low (stems hidden), guessed tip grey and mesh, tilt and
+  lid angle from memory, simplified hinge, no real squircle curvature, grille/port not visible.

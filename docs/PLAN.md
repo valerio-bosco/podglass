@@ -320,7 +320,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
   Requirements: AirPods Pro 2 **Lightning** case (the user's model: speaker grille on the bottom,
   lanyard loop on the right side, Lightning port), lid as a separate object, pods as separate
   objects, PBR materials.
-- [ ] **P3.1 render.py** - Model: Sonnet - Read: docs/UI.md "Renders", `tools/render/shots.toml`
+- [x] **P3.1 render.py** - Model: Sonnet - Read: docs/UI.md "Renders", `tools/render/shots.toml`
   - Do: Blender headless script (`nix develop .#render -c blender -b -P tools/render/render.py --
     --model assets/models/<file> --shot all`): import, center and scale to 1 unit, white-studio
     lighting (key area light 45 deg left-top, fill right, rim back, soft shadow catcher), transparent
