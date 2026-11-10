@@ -18,8 +18,10 @@ import bpy
 from mathutils import Vector
 
 # ---- dimensions (cm) --------------------------------------------------------------------------
-W, D, H = 6.0, 2.2, 4.5            # case width (X), depth (Y), height (Z); measured from the photos: 60 x 45 x 22 mm
-LID_H = H / 3                       # the seam is one third from the top: SEAM = H - LID_H
+# case width (X), depth (Y), height (Z) and lid height: traced 1:1 from the reference reference shots
+# (assets/reference/shots, 175 px/cm); the real case is taller (45.2 mm), the reference wins (user)
+W, D, H = 6.0, 2.2, 4.21
+LID_H = 1.51
 SEAM = H - LID_H
 N_FRONT, N_PLAN = 4.2, 3.2          # superellipse exponents: front view (x/z) and plan (x/y); 2 = ellipse, inf = box
 DOME = 0.07                         # the flat top and bottom faces bulge by this much
@@ -33,7 +35,10 @@ POD_DEPTH = 0.93                    # pod depth / width (photos 239/240 vs 242)
 CAVITY_R = 0.95
 STEM_OFF = 0.42                     # the stem axis sits this far outwards of the head axis (photo 241)
 LED_DROP = 0.83                     # status light below the seam (photo 249: 18% of the case height)
-HINGE_Y = D / 2 - 0.06              # hinge axis (y, z = SEAM): on the back surface, so the lid does not dig into the base
+# lid hinge axis (x direction): fitted to the open lid of the reference end view (121 deg open, IoU 0.95):
+# just behind the back surface and 0.3 above the seam
+HINGE_Y = D / 2 + 0.07
+HINGE_Z = SEAM + 0.30
 
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = args[args.index("--out") + 1] if "--out" in args else "assets/models/airpods-pro2.blend"
@@ -140,9 +145,13 @@ def superell(name, a, b, c, n1=N_FRONT, n2=N_PLAN, center=(0, 0, 0), dome=DOME, 
     return ob
 
 
-def _profile():
+def _profiles():
     here = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "tools/render"
-    return json.load(open(os.path.join(here, "profiles.json")))["front"]
+    return json.load(open(os.path.join(here, "profiles.json")))
+
+
+def _profile():
+    return _profiles()["sf_front"]
 
 
 def traced_shell(name, hd_end=0.42, m=2.7, n_plan=N_PLAN, dome=DOME, nlat=96, nlon=160):
@@ -163,9 +172,19 @@ def traced_shell(name, hd_end=0.42, m=2.7, n_plan=N_PLAN, dome=DOME, nlat=96, nl
                 return hs_t[i] + t * (hs_t[i + 1] - hs_t[i])
         return hs_t[-1]
 
+    end = _profiles()["sf_end"]           # half-depth per height from the reference end view (lid: its open D shape)
+    ze = [r[0] for r in end]
+    de = [r[1] for r in end]
+    for _ in range(4):
+        de = [de[0]] + [(de[i - 1] + 2 * de[i] + de[i + 1]) / 4 for i in range(1, len(de) - 1)] + [de[-1]]
+
     def hd(z):
-        u = abs(2 * z / H - 1)
-        return hd_end + (D / 2 - hd_end) * (1 - u ** m) ** (1 / m)
+        z = min(max(z, 0.0), H)
+        for i in range(len(ze) - 1):
+            if z <= ze[i + 1]:
+                t = (z - ze[i]) / (ze[i + 1] - ze[i])
+                return max(de[i] + t * (de[i + 1] - de[i]), 0.02)
+        return max(de[-1], 0.02)
     e = 2.0 / n_plan
     bm = bmesh.new()
     rings = []
@@ -336,7 +355,7 @@ def build_case(mats, clear=()):
     def shell(name):
         ob = traced_shell(name)
         # hinge notch at the back (the steel plate sits in it)
-        boolean(ob, rbox("notch", 3.2, 0.3, 0.9, 0.0, segs=1, center=(0, HINGE_Y + 0.1, SEAM)))
+        boolean(ob, rbox("notch", 3.2, 0.3, 0.9, 0.0, segs=1, center=(0, D / 2 + 0.04, SEAM)))
         return ob
 
     # ---- base
@@ -457,7 +476,7 @@ def build_hardware(mats, lid):
     smooth(loop, 40)
 
     # move lid origin to the hinge axis
-    bpy.context.scene.cursor.location = (0, HINGE_Y, SEAM)
+    bpy.context.scene.cursor.location = (0, HINGE_Y, HINGE_Z)
     activate(lid)
     bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
     return hinge, led, loop
