@@ -72,3 +72,12 @@ One entry per task: date, task id, model, what was done, what could not be verif
   and were updated. 156 tests pass.
 - The daemon (P2.2/P2.7) must: decrypt with keys.json, call `adv.parse_precise`, pass the result
   to both `apply_advert` and `AdvertSeen`, and read the adapter MAC from BlueZ for `adapter_tail`.
+
+## 2026-11-10 - P2.1 bluez.py (Opus)
+- dbus-fast client: adapter + MAC tail, `find_airpods` (pure `pick_airpods`, 3 tests), connect with
+  15 s timeout, disconnect, `watch_connected`, BatteryProvider1.
+- `podglass debug bluez` prints adapter `E8:48:B8:C8:20:00` (tail `c82000`, equal to the host bytes
+  in the decrypted advert) and the AirPods device. 159 tests pass.
+- `--battery 42`: BlueZ exposes Battery1 Percentage 42, Source "podglass"; upower shows it.
+- Human check pending: `--connect` timed out once (AirPods probably in the closed case); retry with
+  the pods out of the case or in the ears and confirm audio plays.
