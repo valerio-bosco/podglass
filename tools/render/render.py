@@ -42,26 +42,27 @@ R, CAM, LIGHT = cfg["render"], cfg["camera"], cfg["light"]
 
 
 def pick_device():
-    """GPU (OPTIX, then CUDA) when available and allowed, else CPU. Prints the choice."""
-    if DEVICE != "cpu":
-        prefs = bpy.context.preferences.addons["cycles"].preferences
-        for kind in ("OPTIX", "CUDA"):
-            try:
-                prefs.compute_device_type = kind
-                prefs.refresh_devices() if hasattr(prefs, "refresh_devices") else None
-                gpus = [d for d in prefs.get_devices_for_type(kind) if d.type == kind]
-            except Exception as e:  # type not compiled in
-                print(f"device {kind}: unavailable ({e})")
-                continue
-            if gpus:
-                for d in prefs.devices:
-                    d.use = d.type == kind
-                print("render device: GPU", kind, [d.name for d in gpus])
-                return "GPU"
-        if DEVICE == "gpu":
-            print("no GPU found, falling back to CPU")
-    print("render device: CPU")
-    return "CPU"
+    """GPU (CUDA, then OPTIX: a GTX 1060 has no RT cores). `auto` and `gpu` fail with an error when there is no GPU;
+    the CPU is used only with an explicit `--device cpu`."""
+    if DEVICE == "cpu":
+        print("render device: CPU (explicit)")
+        return "CPU"
+    prefs = bpy.context.preferences.addons["cycles"].preferences
+    for kind in ("CUDA", "OPTIX"):
+        try:
+            prefs.compute_device_type = kind
+            prefs.refresh_devices()
+            gpus = [d for d in prefs.get_devices_for_type(kind) if d.type == kind]
+        except Exception as e:  # type not compiled in
+            print(f"device {kind}: unavailable ({e})")
+            continue
+        if gpus:
+            for d in prefs.devices:
+                d.use = d.type == kind
+            print("render device: GPU", kind, [d.name for d in gpus])
+            return "GPU"
+    raise SystemExit("error: no GPU (OPTIX/CUDA) found; refusing to render on the CPU. "
+                     "Use --device cpu to opt in.")
 
 
 def setup_scene():
@@ -71,6 +72,8 @@ def setup_scene():
     sc.cycles.samples = int(SAMPLES or R["samples"])
     sc.cycles.use_denoising = R["denoise"]
     sc.cycles.device = pick_device()
+    sc.render.threads_mode = "FIXED"
+    sc.render.threads = 2  # keep the host light, the GPU does the work
     sc.render.film_transparent = True
     sc.render.image_settings.file_format = "PNG"
     sc.render.image_settings.color_mode = "RGBA"

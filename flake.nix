@@ -33,7 +33,9 @@
             };
           in
           pkgs.mkShell {
-            packages = [ pkgsCuda.blender pkgs.libwebp ];
+            packages = [ pkgsCuda.blender pkgs.libwebp pkgsCuda.cudaPackages.cuda_nvcc pkgs.gcc ];
+            # Pascal (GTX 1060) has no prebuilt Cycles kernels: Blender compiles them with nvcc
+            buildInputs = [ pkgsCuda.cudaPackages.cuda_cudart pkgsCuda.cudaPackages.cuda_cccl ];
           };
       });
     };
