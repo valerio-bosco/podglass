@@ -315,10 +315,11 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
 ### Phase 3 - renders (needs D1)
 
 - [ ] **P3.0 Build the model** - Model: user + Sonnet (Blender) - per D1, model the case and pods in
-  Blender from reference photos and save `assets/models/airpods-pro2-usbc.blend`; fallback: a model
-  found online (glb, fbx, blend or usdz) in the same folder.
-  Requirements: AirPods Pro 2 **USB-C** case (speaker grille on the bottom, lanyard loop on the right
-  side), lid as a separate object, pods as separate objects, PBR materials.
+  Blender (scripted, see docs/NEXT.md W3) and save `assets/models/airpods-pro2.blend`; fallback: a
+  model found online (glb, fbx, blend or usdz) in the same folder.
+  Requirements: AirPods Pro 2 **Lightning** case (the user's model: speaker grille on the bottom,
+  lanyard loop on the right side, Lightning port), lid as a separate object, pods as separate
+  objects, PBR materials.
 - [ ] **P3.1 render.py** - Model: Sonnet - Read: docs/UI.md "Renders", `tools/render/shots.toml`
   - Do: Blender headless script (`nix develop .#render -c blender -b -P tools/render/render.py --
     --model assets/models/<file> --shot all`): import, center and scale to 1 unit, white-studio
