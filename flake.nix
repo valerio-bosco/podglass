@@ -10,8 +10,16 @@
       pythonFor = pkgs: pkgs.python3.withPackages (ps: [ ps.bleak ps.dbus-fast ps.cryptography ps.pytest ]);
     in
     {
-      # `nix flake check`: the test suite passes
+      packages = forAll (pkgs: rec {
+        podglass = pkgs.callPackage ./nix/package.nix { };
+        default = podglass;
+      });
+
+      homeManagerModules.default = import ./nix/hm-module.nix self;
+
+      # `nix flake check`: the package builds and the test suite passes
       checks = forAll (pkgs: {
+        package = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
         tests = pkgs.runCommand "podglass-tests" { nativeBuildInputs = [ (pythonFor pkgs) ]; } ''
           cp -r ${pkgs.lib.cleanSource ./.} src && chmod -R u+w src && cd src
           export HOME=$TMPDIR
