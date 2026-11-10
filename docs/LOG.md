@@ -91,3 +91,12 @@ One entry per task: date, task id, model, what was done, what could not be verif
   or-pattern `4c 00 07`, active fallback. Yields `Seen(adv, known, precise, device)`.
 - 6 tests (synthetic RPA from the Core Spec IRK, real advert header). 165 tests pass.
 - Live: `podglass debug scan` with pods in ears -> "mine", exact L84 R82, host c82000 (this PC).
+
+## 2026-11-10 - P2.3 aap_session.py (Opus)
+- `AapSession`: non-blocking L2CAP socket, reader task -> queue, startup (handshake ack 3 s,
+  features, notifications, key request only when keys.json lacks the device), keys stored on the
+  first `Keys`. Fails fast if the AirPods hang up during the handshake.
+- `run_sessions()`: one session at a time while BlueZ says connected, backoff 1-30 s.
+- 4 tests with a socketpair as fake AirPods. 169 tests pass.
+- Live: `podglass debug aap --mode transparency` then `--mode anc`: the AirPods echoed both
+  modes (PROTOCOL.md 2.4 confirmed), battery L82 R82, both in ear, firmware 6807.

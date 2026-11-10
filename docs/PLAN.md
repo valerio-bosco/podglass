@@ -289,7 +289,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
 - [x] **P2.2 scanner.py** - Model: Sonnet - Read: SPIKE.md (strategy), adv.py, crypto.py
   - Do: async generator of `Advert` for **my** AirPods only (resolved with keys.json), plus
     pairing-mode adverts; dedupe identical payloads within 1 s; strategy from SPIKE.md.
-- [ ] **P2.3 aap_session.py** - Model: Sonnet - Read: PROTOCOL.md 2, aap.py
+- [x] **P2.3 aap_session.py** - Model: Sonnet - Read: PROTOCOL.md 2, aap.py
   - Do: asyncio wrapper over the L2CAP socket (`loop.sock_recv`), startup sequence with 3 s
     timeouts, reconnect with backoff while BlueZ says connected, `send(bytes)`, async iterator of
     `AapEvent`. Store keys on first `Keys` event.
