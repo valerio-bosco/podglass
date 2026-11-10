@@ -84,10 +84,11 @@ journalctl --user -u podglass -u podglass-ui -b
 podglass status
 ```
 
-Then run the end-to-end checklist (PLAN.md section 5, P5.3). If `hyprctl` calls in the daemon log
-"no instance", the user manager lacks `HYPRLAND_INSTANCE_SIGNATURE`; the compositor config should
-run `systemctl --user import-environment HYPRLAND_INSTANCE_SIGNATURE WAYLAND_DISPLAY`
-(serpantinum normally does this).
+Then run the end-to-end checklist (PLAN.md section 5, P5.3). The daemon finds Hyprland by itself
+when the user manager lacks `HYPRLAND_INSTANCE_SIGNATURE` (newest instance in
+`$XDG_RUNTIME_DIR/hypr`); if Hyprland cannot be asked at all it treats the user as present, so
+in-ear autoconnect keeps working. The UI service still needs `WAYLAND_DISPLAY` in the user manager
+(serpantinum normally imports it).
 
 ## Renders
 

@@ -70,3 +70,21 @@ def test_cli_status_format_and_validation(capsys):
                            "mode": "anc", "lid": "closed"})
     assert "connected" in text and "case 1% (charging)" in text and "approx" not in text
     assert main(["set", "mode", "loud"]) == 2
+
+
+def test_hyprland_signature(tmp_path):
+    import os
+    import time
+
+    from podglass.daemon import _hyprland_signature
+
+    assert _hyprland_signature(tmp_path / "missing") is None
+    old, new, empty = tmp_path / "old", tmp_path / "new", tmp_path / "empty"
+    for d in (old, new, empty):
+        d.mkdir()
+    (old / ".socket.sock").touch()
+    (new / ".socket.sock").touch()
+    t = time.time()
+    os.utime(old, (t - 100, t - 100))
+    os.utime(new, (t, t))
+    assert _hyprland_signature(tmp_path) == "new"

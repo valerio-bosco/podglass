@@ -33,6 +33,15 @@ FIND_DEVICE_S = 10  # retry interval while BlueZ does not know the AirPods yet
 ACTIVITY_POLL_S = 15
 
 
+def _hyprland_signature(hypr_dir: Path) -> str | None:
+    """Newest Hyprland instance (directory with a .socket.sock) under $XDG_RUNTIME_DIR/hypr."""
+    try:
+        dirs = [d for d in hypr_dir.iterdir() if (d / ".socket.sock").exists()]
+    except OSError:
+        return None
+    return max(dirs, key=lambda d: d.stat().st_mtime).name if dirs else None
+
+
 class Daemon:
     def __init__(self, config: Config, replay: Path | None = None):
         self.config = config
@@ -246,19 +255,32 @@ class Daemon:
         log.info("replay finished")
 
     async def activity(self) -> None:
-        """User activity on this PC: the cursor or the focused window changed (Hyprland)."""
+        """User activity on this PC: the cursor or the focused window changed (Hyprland).
+
+        As a systemd user service HYPRLAND_INSTANCE_SIGNATURE may be missing: take the newest
+        instance in $XDG_RUNTIME_DIR/hypr. If Hyprland cannot be asked at all, count the user as
+        present, so autoconnect still works.
+        """
+        env = dict(os.environ)
+        if "HYPRLAND_INSTANCE_SIGNATURE" not in env:
+            sig = _hyprland_signature(Path(env.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "hypr")
+            if sig:
+                env["HYPRLAND_INSTANCE_SIGNATURE"] = sig
         last = None
         while True:
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    "sh", "-c", "hyprctl -j cursorpos; hyprctl -j activewindow",
-                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+                    "sh", "-c", "hyprctl -j cursorpos && hyprctl -j activewindow",
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, env=env)
                 out, _ = await proc.communicate()
-                if last is not None and out != last:
-                    self.step(InputActivity())
-                last = out
+                ok = proc.returncode == 0
             except FileNotFoundError:
-                return
+                ok, out = False, b""
+            if not ok:
+                self.step(InputActivity())  # no way to tell: assume the user is here
+            elif last is not None and out != last:
+                self.step(InputActivity())
+            last = out if ok else None
             await asyncio.sleep(ACTIVITY_POLL_S)
 
     async def find_device(self) -> None:
