@@ -268,7 +268,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
     while the lid stays open; `hide_card` cancelled if the lid reopens within 1.5 s.
 - [x] **P1.7 config.py + keys.py** - Model: Haiku - Depends: P1.1
   - Do: config keys and defaults: `autoconnect = "in-ear"`, `ear_pause = true`,
-    `ca_duck = true`, `ca_duck_volume = 0.3`, `battery_widget = false`, `card_timeout_s = 0`
+    `ca_duck = false` (user choice 2026-11-10), `ca_duck_volume = 0.3`, `battery_widget = false`, `card_timeout_s = 0`
     (0 = stay while lid open), `theme = "auto"`. keys.json written atomically with mode 0600.
   - Done when: tests with a temp dir; unknown config keys are ignored with a warning.
 
@@ -298,7 +298,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
     `daemon`, `watch`, `status`, `set ...`, `show-card`, `popover`, `edit`, `debug bluez|scan|aap`.
     `show-card`/`popover`/`edit` call `quickshell ipc -p <ui path> call podglass <fn>`.
   - Done when: `tests/test_ipc.py` runs a server with a fake state and a client in the same loop.
-- [ ] **P2.5 media.py** - Model: Haiku - Do: `pause()`, `resume()` via `playerctl` (remember which
+- [x] **P2.5 media.py** - Model: Haiku - Do: `pause()`, `resume()` via `playerctl` (remember which
   players were playing), `duck(v)`/`restore()` via `wpctl set-volume @DEFAULT_AUDIO_SINK@`.
   Done when: tests with a fake runner (subprocess calls injected).
 - [ ] **P2.6 tray.py** - Model: Sonnet

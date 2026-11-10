@@ -140,7 +140,7 @@ def test_second_pod_out_does_not_pause_twice():
 
 
 def test_conversation_awareness_ducks_and_restores():
-    p = policy(ca_duck_volume=0.25)
+    p = policy(ca_duck=True, ca_duck_volume=0.25)
     assert p.step(CaVolumeChanged(1), 0) == [Action("duck_volume", 0.25)]
     assert p.step(CaVolumeChanged(2), 1) == []
     assert p.step(CaVolumeChanged(3), 2) == [Action("restore_volume")]
@@ -256,7 +256,7 @@ def test_user_disconnect_cleared_by_lid_close():
 
 
 def test_disconnect_restores_ducked_volume():
-    p = policy()
+    p = policy(ca_duck=True)
     p.step(Bluez(True), 0)
     p.step(CaVolumeChanged(1), 1)
     assert names(p.step(Bluez(False), 2))[-1] == "restore_volume"
@@ -297,3 +297,7 @@ def test_unknown_adverts_do_not_keep_card_alive():
     p.step(LID_OPEN, 0)
     p.step(seen(known=False, lid_open=True), 2)
     assert names(p.step(Tick(), 3)) == ["emit:lid-closed", "hide_card"]
+
+
+def test_no_ducking_by_default():
+    assert policy().step(CaVolumeChanged(1), 0) == []

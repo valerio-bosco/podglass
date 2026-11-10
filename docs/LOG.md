@@ -111,3 +111,10 @@ One entry per task: date, task id, model, what was done, what could not be verif
   one-shot `podglass set` that closed with unread data reset the connection and lost the command
   (client now half-closes and drains). 173 tests pass.
 - Not live-tested: there is no daemon yet (P2.7).
+
+## 2026-11-10 - P2.5 media.py (Opus)
+- `Media.pause()/resume()` via playerctl, only players that were playing; `duck()/restore()` via
+  wpctl on the default sink, never raises the volume.
+- User decision: no volume ducking while talking. `ca_duck` default is now false (config, PLAN);
+  the code stays behind the option. 178 tests pass.
+- Live (read-only): playerctl sees `spotify`, wpctl reads the sink volume.

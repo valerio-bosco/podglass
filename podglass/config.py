@@ -16,7 +16,7 @@ THEMES = ("auto", "light", "dark")
 class Config:
     autoconnect: str = "in-ear"
     ear_pause: bool = True
-    ca_duck: bool = True
+    ca_duck: bool = False  # the user does not want the volume lowered while talking (2026-11-10)
     ca_duck_volume: float = 0.3
     battery_widget: bool = False
     card_timeout_s: float = 0  # 0 = stay while the lid is open

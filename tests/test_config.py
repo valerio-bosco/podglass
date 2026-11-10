@@ -5,7 +5,7 @@ from podglass.config import Config, load_config, parse_config
 
 def test_defaults():
     assert parse_config("") == Config(
-        autoconnect="in-ear", ear_pause=True, ca_duck=True, ca_duck_volume=0.3,
+        autoconnect="in-ear", ear_pause=True, ca_duck=False, ca_duck_volume=0.3,
         battery_widget=False, card_timeout_s=0, theme="auto")
 
 
