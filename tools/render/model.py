@@ -19,12 +19,12 @@ from mathutils import Vector
 
 # ---- dimensions (cm) --------------------------------------------------------------------------
 # case width (X), depth (Y), height (Z) and lid height: traced 1:1 from the reference reference shots
-# (assets/reference/shots, 175 px/cm); the real case is taller (45.2 mm), the reference wins (user)
-W, D, H = 6.0, 2.2, 4.21
-LID_H = 1.51
+# (assets/reference/shots, 175 px/cm): base 2.97 high, lid 1.54, closed 4.51 (the real case: 45.2 mm)
+W, D, H = 6.0, 2.2, 4.51
+LID_H = 1.54
 SEAM = H - LID_H
 N_FRONT, N_PLAN = 4.2, 3.2          # superellipse exponents: front view (x/z) and plan (x/y); 2 = ellipse, inf = box
-DOME = 0.07                         # the flat top and bottom faces bulge by this much
+DOME = 0.03                         # the flat top and bottom faces bulge by this much
 WALL = 0.1                          # lid wall thickness
 POD_SCALE = 1.0                    # pod size vs the model below: head ~1.55 wide vs 6.0 case (photos 242/243)
 POD_X = 1.6                        # pod centers at +-POD_X
@@ -34,11 +34,13 @@ POD_Y = 0.12                        # the tilt swings the stems forwards: set th
 POD_DEPTH = 0.93                    # pod depth / width (photos 239/240 vs 242)
 CAVITY_R = 0.95
 STEM_OFF = 0.42                     # the stem axis sits this far outwards of the head axis (photo 241)
-LED_DROP = 0.83                     # status light below the seam (photo 249: 18% of the case height)
-# lid hinge axis (x direction): fitted to the open lid of the reference end view (121 deg open, IoU 0.95):
-# just behind the back surface and 0.3 above the seam
-HINGE_Y = D / 2 + 0.07
-HINGE_Z = SEAM + 0.30
+LED_DROP = 0.78                     # status light below the seam (reference front shot: 0.08 wide)
+# lid hinge axis (x direction): solved from the open lid of the reference end view (121 deg open): the back rim
+# corner of the closed lid (y = 1.09, z = SEAM + gap) lands on the observed corner
+HINGE_Y = 1.08
+HINGE_Z = SEAM + 0.158
+N_LID_RIM = float(sys.argv[sys.argv.index("--nrim") + 1]) if "--nrim" in sys.argv else 4.0   # plan exponent at the rim, blended to N_PLAN_LID over 0.6 cm
+N_PLAN_LID = float(sys.argv[sys.argv.index("--nlid") + 1]) if "--nlid" in sys.argv else 4.0                    # the lid plan section is boxier than the base's (front-view widths)
 
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = args[args.index("--out") + 1] if "--out" in args else "assets/models/airpods-pro2.blend"
@@ -154,54 +156,53 @@ def _profile():
     return _profiles()["sf_front"]
 
 
-def traced_shell(name, hd_end=0.42, m=2.7, n_plan=N_PLAN, dome=DOME, nlat=96, nlon=160):
-    """Case body from two traced silhouettes. At height z the plan section is a superellipse with half-width
-    hw(z) from the front photo (249, tools/render/trace.py) and half-depth hd(z) from the end photo (245):
-    an ellipse-like pill of exponent `m` that keeps a flat end face `hd_end` deep."""
-    prof = _profile()
-    zs_t = [r[0] for r in prof]
-    hs_t = [r[1] for r in prof]
-    for _ in range(4):  # smooth the traced noise (pixel steps would show as bands in the reflections)
-        hs_t = [hs_t[0]] + [(hs_t[i - 1] + 2 * hs_t[i] + hs_t[i + 1]) / 4 for i in range(1, len(hs_t) - 1)] + [hs_t[-1]]
+def _case_table():
+    """tools/render/profiles_case.json: rows [z, half-width, y front, y back] of the closed case (base + lid),
+    smoothed (pixel steps would show as bands in the reflections)."""
+    here = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "tools/render"
+    rows = json.load(open(os.path.join(here, "profiles_case.json")))["case_shell"]
+    cols = [[r[i] for r in rows] for i in range(4)]
+    for k in (1, 2, 3):
+        c = cols[k]
+        for _ in range(3):
+            c = [c[0]] + [(c[i - 1] + 2 * c[i] + c[i + 1]) / 4 for i in range(1, len(c) - 1)] + [c[-1]]
+        cols[k] = c
+    return cols
 
-    def hw(z):
+
+def traced_shell(name, dome=DOME, nlat=120, nlon=160):
+    """Case body from the traced reference silhouettes (profiles_case.json). At height z the plan section is a
+    superellipse with half-width hw(z) (front view), spanning y in [yf(z), yb(z)] (end view; the lid is lopsided:
+    round at the front, slanted at the back), exponent N_PLAN (base) or N_PLAN_LID (lid)."""
+    zs, hws, yfs, ybs = _case_table()
+
+    def at(col, z):
         z = min(max(z, 0.0), H)
-        for i in range(len(zs_t) - 1):
-            if z <= zs_t[i + 1]:
-                t = (z - zs_t[i]) / (zs_t[i + 1] - zs_t[i])
-                return hs_t[i] + t * (hs_t[i + 1] - hs_t[i])
-        return hs_t[-1]
-
-    end = _profiles()["sf_end"]           # half-depth per height from the reference end view (lid: its open D shape)
-    ze = [r[0] for r in end]
-    de = [r[1] for r in end]
-    for _ in range(4):
-        de = [de[0]] + [(de[i - 1] + 2 * de[i] + de[i + 1]) / 4 for i in range(1, len(de) - 1)] + [de[-1]]
-
-    def hd(z):
-        z = min(max(z, 0.0), H)
-        for i in range(len(ze) - 1):
-            if z <= ze[i + 1]:
-                t = (z - ze[i]) / (ze[i + 1] - ze[i])
-                return max(de[i] + t * (de[i + 1] - de[i]), 0.02)
-        return max(de[-1], 0.02)
-    e = 2.0 / n_plan
+        for i in range(len(zs) - 1):
+            if z <= zs[i + 1]:
+                t = (z - zs[i]) / (zs[i + 1] - zs[i])
+                return col[i] + t * (col[i + 1] - col[i])
+        return col[-1]
     bm = bmesh.new()
     rings = []
-    for i in range(nlat + 1):
-        z = H / 2 * (1 - math.cos(math.pi * i / nlat))
-        a_, b_ = hw(z), hd(z)
+    zl = [H / 2 * (1 - math.cos(math.pi * i / nlat)) for i in range(nlat + 1)]
+    zl = sorted(set(zl + [SEAM - 0.01, SEAM + 0.01, SEAM + 0.03]))
+    for z in zl:
+        a_ = at(hws, z)
+        yc, b_ = (at(yfs, z) + at(ybs, z)) / 2, max((at(ybs, z) - at(yfs, z)) / 2, 0.02)
+        n_ = N_PLAN if z < SEAM + 0.02 else N_LID_RIM + (N_PLAN_LID - N_LID_RIM) * min((z - SEAM - 0.02) / 0.6, 1.0)
+        e = 2.0 / n_
         ring = []
         for k in range(nlon):
             t = 2 * math.pi * k / nlon
             ring.append(bm.verts.new((a_ * math.copysign(abs(math.cos(t)) ** e, math.cos(t)),
-                                      b_ * math.copysign(abs(math.sin(t)) ** e, math.sin(t)), z)))
+                                      yc + b_ * math.copysign(abs(math.sin(t)) ** e, math.sin(t)), z)))
         rings.append(ring)
     for r0, r1 in zip(rings, rings[1:]):
         for k in range(nlon):
             bm.faces.new((r0[k], r0[(k + 1) % nlon], r1[(k + 1) % nlon], r1[k]))
     for ring, up in ((rings[0], False), (rings[-1], True)):
-        pole = bm.verts.new((0, 0, H + dome if up else -dome))
+        pole = bm.verts.new((0, (at(yfs, H) + at(ybs, H)) / 2 if up else 0, H if up else -dome))
         for k in range(nlon):
             f = (ring[k], ring[(k + 1) % nlon], pole) if up else (ring[(k + 1) % nlon], ring[k], pole)
             bm.faces.new(f)
@@ -222,10 +223,11 @@ def inner_shell(name, wall=WALL):
     return ob
 
 
-def clean(obj, dist=2e-4):
+def clean(obj, dist=4e-4):
     """Dissolve the sliver faces the exact booleans leave: with weighted normals they shade black."""
     bm = bmesh.new()
     bm.from_mesh(obj.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=dist)
     bmesh.ops.dissolve_degenerate(bm, dist=dist, edges=bm.edges)
     bm.to_mesh(obj.data)
     bm.free()
@@ -316,6 +318,7 @@ def make_materials():
         "white_rough": material("White inside", (0.92, 0.91, 0.88), rough=0.35, coat=0.0),
         "grey_tip": material("Silicone tip", (0.82, 0.77, 0.6), rough=0.4, sss=(0.35, (0.8, 0.82, 0.85))),
         "mesh": material("Mesh", (0.03, 0.03, 0.034), rough=0.6, bump=(420.0, 0.9)),
+        "gold": material("Gold", (0.85, 0.62, 0.25), rough=0.3, metal=1.0),
         "steel": material("Steel", (0.82, 0.82, 0.83), rough=0.28, metal=1.0),
         "dark": material("Dark", (0.01, 0.01, 0.012), rough=0.5),
         "led": material("LED", (0.6, 1.0, 0.55), rough=0.4, emission=((0.6, 1.0, 0.55), 6.0)),
@@ -353,21 +356,25 @@ def build_case(mats, clear=()):
     gap = 0.02
 
     def shell(name):
-        ob = traced_shell(name)
-        # hinge notch at the back (the steel plate sits in it)
-        boolean(ob, rbox("notch", 3.2, 0.3, 0.9, 0.0, segs=1, center=(0, D / 2 + 0.04, SEAM)))
-        return ob
+        return traced_shell(name)
 
     # ---- base
     base = shell("Case_Base")
     boolean(base, rbox("keep", W * 2, D * 2, SEAM - gap + 5, 0.0, segs=1, center=(0, 0, (SEAM - gap - 5) / 2)), "INTERSECT")
-    # lanyard slot in the right end (photo 246): stadium 1.0 (z) x 0.46 (y), dark inside
-    boolean(base, rbox("pocket", 0.5, 0.46, 1.0, 0.22, segs=6, center=(W / 2, 0.0, SEAM - 0.91)))  # 0.25 deep: the stem cavity is right behind it
-    # Lightning slot (photo 247): centered, 1.0 x 0.3, rounded ends; speaker holes 3 left + 1 right of it
+    # lanyard recess in the right end (reference right shot): white stadium 0.47 (y) x 0.95 (z), 0.05 deep,
+    # with two round dimples (0.37 wide, 0.08 deep) in it; no steel eyes
+    lz = SEAM - 0.84
+    boolean(base, rbox("pocket", 0.2, 0.47, 0.47, 0.0, segs=1, center=(W / 2 + 0.05, 0.0, lz)))
+    for dz in (-0.235, 0.235):
+        boolean(base, cyl("pocket_r", 0.235, 0.2, (W / 2 + 0.05, 0.0, lz + dz), rot=(0, math.pi / 2, 0), verts=40))
+    for dz in (-0.27, 0.27):
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.26, segments=40, ring_count=20, location=(W / 2 + 0.13, 0.0, lz + dz))
+        boolean(base, bpy.context.active_object)
+    # Lightning slot (photo 247): centered, 1.0 x 0.3, rounded ends; speaker holes 1 left + 3 right of it (reference bottom shot)
     boolean(base, rbox("port", 1.0, 0.3, 1.0, 0.14, segs=6, center=(0.0, 0.0, 0.0)))
-    for hx in (-2.04, -1.79, -1.54, 1.57):
-        boolean(base, cyl("hole", 0.07, 1.0, (hx, 0.0, 0.0), verts=12))
-    boolean(base, cyl("ledcut", 0.06, 0.1, (0, -D / 2, SEAM - LED_DROP), rot=(math.pi / 2, 0, 0), verts=24))
+    for hx in (-1.40, 1.44, 1.67, 1.90):   # see-through in the reference bottom shot: up into the pod cavity
+        boolean(base, cyl("hole", 0.063, 4.4, (hx, 0.0, 0.0), verts=16))
+    boolean(base, cyl("ledcut", 0.045, 0.1, (0, -D / 2, SEAM - LED_DROP), rot=(math.pi / 2, 0, 0), verts=24))
     boolean(base, thumb_scoop())
     # recessed top face: a thin rim stands around the interior (photos 242/243)
     rec = superell("rec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM - gap + 0.5 - 0.07), dome=0.0, nlat=8, nlon=96)
@@ -415,10 +422,8 @@ def build_case(mats, clear=()):
     # materials
     def base_pick(p):
         c, n = p.center, p.normal
-        if c.z < 0.9 and abs(c.y) < 0.3 and c.z > 0.02 and (abs(c.x) < 0.6 or abs(abs(c.x) - 1.8) < 0.5):
+        if c.z < 0.9 and abs(c.y) < 0.3 and c.z > 0.02 and (abs(c.x) < 0.6 or 1.2 < abs(c.x) < 2.2):
             return 2  # port and speaker holes
-        if W / 2 - 0.5 < c.x < W / 2 - 0.08 and abs(c.y) < 0.3 and SEAM - 1.5 < c.z < SEAM - 0.3:
-            return 2  # lanyard slot
         d0 = math.hypot(abs(c.x) - POD_X, c.y)
         d1 = math.hypot(abs(c.x) - POD_X - STEM_OFF, c.y)
         inside = c.z > SEAM - 2.6 and (d0 < 1.3 or d1 < 0.62 or (abs(c.x) < 1.7 and abs(c.y) < 0.75 and c.z > SEAM - 1.3)
@@ -435,51 +440,36 @@ def build_case(mats, clear=()):
 
 
 def build_hardware(mats, lid):
-    # steel hinge plate on the back (photo 248): about half the width, 0.7 high, straddling the seam, two small slits
-    hinge = rbox("Case_Hinge", 3.0, 0.12, 0.7, 0.03, segs=2, center=(0, D / 2 - 0.045, SEAM + 0.15))
-    smooth(hinge, 40)
-    hinge.data.materials.append(mats["steel"])
-    # photo 248: the plate is split by two L-shaped slits (vertical, then along the seam to the outside)
-    yy = D / 2 + 0.018
-    cuts = []
-    for sx in (-1, 1):
-        cuts.append(rbox("slit", 0.035, 0.03, 0.66 * 0.5 + 0.35 - 0.1, 0.0, segs=1, center=(sx * 0.82, yy, SEAM + 0.15 + 0.17)))
-        cuts.append(rbox("slit", 0.7, 0.03, 0.035, 0.0, segs=1, center=(sx * (0.82 + 0.35), yy, SEAM - 0.02)))
-    for c_ in cuts:
-        c_.data.materials.append(mats["dark"])
-        c_.parent = hinge
-
-    led = cyl("Case_LED", 0.06, 0.03, (0, -D / 2 + 0.01, SEAM - LED_DROP), rot=(math.pi / 2, 0, 0), verts=24)
+    # no hinge plate: the reference back shot shows a plain wall
+    led = cyl("Case_LED", 0.045, 0.03, (0, -D / 2 + 0.01, SEAM - LED_DROP), rot=(math.pi / 2, 0, 0), verts=24)
     led.data.materials.append(mats["led"])
 
-    # pairing button: a thin engraved ring on the back, 0.8 wide, 1.5 below the seam (photo 248)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.3, minor_radius=0.012, major_segments=48, minor_segments=8,
-                                     location=(0, D / 2 - 0.004, SEAM - 1.25), rotation=(math.pi / 2, 0, 0))
+    # pairing button: a thin engraved ring on the back, 0.57 wide, 1.18 below the seam (reference back shot)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.285, minor_radius=0.012, major_segments=48, minor_segments=8,
+                                     location=(0, D / 2 - 0.004, SEAM - 1.18), rotation=(math.pi / 2, 0, 0))
     btn = bpy.context.active_object
     btn.name = "Case_Button"
     btn.data.materials.append(mats["dark"])
     bpy.ops.object.shade_smooth()
 
-    # lanyard loop (photo 246): two steel eyes in the dark slot of the right end
-    eyes = []
-    for dz in (-0.27, 0.27):
-        e = cyl("eye", 0.19, 0.1, (W / 2 - 0.12, 0.0, SEAM - 0.91 + dz), rot=(0, math.pi / 2, 0), verts=24)
-        eyes.append(e)
-    loop = eyes[0]
+    # Lightning contacts: a row of gold pins on the roof of the port (reference bottom shot)
+    pins = []
+    for i in range(12):
+        pins.append(rbox("pin", 0.04, 0.1, 0.03, 0.0, segs=1, center=(-0.4 + i * 0.0727, 0.06, 0.45)))
+    pin = pins[0]
     bpy.ops.object.select_all(action="DESELECT")
-    for e in eyes:
-        e.select_set(True)
-    bpy.context.view_layer.objects.active = loop
+    for q in pins:
+        q.select_set(True)
+    bpy.context.view_layer.objects.active = pin
     bpy.ops.object.join()
-    loop.name = "Case_Loop"
-    loop.data.materials.append(mats["steel"])
-    smooth(loop, 40)
+    pin.name = "Case_Pins"
+    pin.data.materials.append(mats["gold"])
 
     # move lid origin to the hinge axis
     bpy.context.scene.cursor.location = (0, HINGE_Y, HINGE_Z)
     activate(lid)
     bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
-    return hinge, led, loop
+    return led, pin
 
 
 # ---- pods ------------------------------------------------------------------------------------
@@ -669,7 +659,7 @@ def main():
         pod.location = (sx * POD_X, POD_Y, SEAM + POD_RISE)
         pod.rotation_euler = (-math.radians(POD_TILT), 0, 0)
     base, lid = build_case(mats, pod_clearance())
-    hinge, led, loop = build_hardware(mats, lid)
+    led, pins = build_hardware(mats, lid)
     bpy.ops.wm.save_as_mainfile(filepath=OUT)
     print("saved", OUT)
 

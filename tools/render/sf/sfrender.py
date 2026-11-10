@@ -5,7 +5,7 @@ Workbench silhouettes (white on transparent, ~1-2 s each) from the cameras of th
 (front IoU 0.994, end 0.97)."""
 import json, math, sys
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 a = sys.argv[sys.argv.index("--") + 1:]
 opt = lambda k, d: a[a.index(k) + 1] if k in a else d
 VIEWS = opt("--views", "front").split(",")
@@ -14,6 +14,12 @@ O = Vector([float(v) for v in opt("--off", "0,-0.000315,0.000157").split(",")]) 
 HIDE = [h for h in opt("--hide", "").split(",") if h]
 OUT = opt("--out", "/tmp/claude-1000/m7/ours")
 FOV = float(opt("--fov", "6"))
+# pole views: the viewer rolls the camera about the view axis (fitted on the case silhouette: IoU 0.96)
+UPS = {"top": (-1, 0, 0), "bottom": (-1, 0, 0)}
+ROLLS = {"top": "197", "bottom": "-60"}
+for u in opt("--up", "").split(";"):
+    if u:
+        k, v = u.split("="); UPS[k] = tuple(float(c) for c in v.split(","))
 CASE_T, CASE_D = Vector((0, 0.0014, 0.0038)), 0.08
 POD_T, POD_D = Vector((-0.0018, -0.0002, 0.0062)), 0.035
 DIRS = {"front": (0, -1, 0), "back": (0, 1, 0), "right": (1, 0, 0), "left": (-1, 0, 0), "top": (0, -0.002, 1),
@@ -42,13 +48,24 @@ sc.camera = cam
 cam.data.sensor_fit = "VERTICAL"
 cam.data.angle = math.radians(FOV)
 cam.data.clip_start, cam.data.clip_end = 0.1, 1000
-for v in VIEWS:
+for vv in VIEWS:
+    v, _, roll = vv.partition("@")     # "top@30": roll the camera about the view axis by 30 degrees (default: ROLLS)
+    roll = roll or ROLLS.get(v, "")
     T, D = (POD_T, POD_D) if v.startswith("pod-") else (CASE_T, CASE_D)
     d = Vector(DIRS[v]).normalized()
     eye_sf = T + d * D
     eye, tgt = (eye_sf - O) / S, (T - O) / S
     cam.location = eye
-    cam.rotation_euler = (tgt - eye).to_track_quat("-Z", "Y").to_euler()
-    sc.render.filepath = f"{OUT}/{v}.png"
+    if v in UPS or roll:
+        z_ax = (eye - tgt).normalized()
+        up_v = Vector(UPS.get(v, (0, 0, 1)))
+        if roll:
+            up_v = Matrix.Rotation(math.radians(float(roll)), 3, z_ax) @ up_v
+        x_ax = up_v.cross(z_ax).normalized()
+        y_ax = z_ax.cross(x_ax)
+        cam.rotation_euler = Matrix((x_ax, y_ax, z_ax)).transposed().to_euler()
+    else:
+        cam.rotation_euler = (tgt - eye).to_track_quat("-Z", "Y").to_euler()
+    sc.render.filepath = f"{OUT}/{vv}.png"
     bpy.ops.render.render(write_still=True)
-    print("RENDERED", v)
+    print("RENDERED", vv)

@@ -13,7 +13,7 @@ adaptive = true
 view_transform = "AgX"
 look = "AgX - Medium High Contrast"
 exposure = -0.6
-open_angle = 121.0     # lid opening in degrees, hinge axis = Case_Lid origin (X axis); as in the reference reference
+open_angle = 120.3     # lid opening in degrees, hinge axis = Case_Lid origin (X axis); as in the reference reference
 
 [camera]
 lens = 105.0           # mm, long lens = little perspective
