@@ -196,3 +196,10 @@ One entry per task: date, task id, model, what was done, what could not be verif
 - Coordinator review of the photo comparison: visible seam ring where the stem meets the head, a
   translucent ring at the stem bottom, the bottom mic reads as a side dot; the thumb notch on the
   closed case reads as a long groove, not a scoop; pod heads slightly small/less glossy than in 243.
+
+## 2026-11-10 - model round 5 merged (agent on Sonnet, GPU only)
+- Pod head + stem one mesh (boolean union, voxel remesh 0.022, smoothing): no seam ring. Stem ends
+  in a rounded white cap with the dark mic opening on the tip. Thumb notch is a small rounded
+  scoop at the front centre. Pods scaled 0.96 with the case's glossy material. Full set 14 min 27 s.
+- Open gaps: the real notch is wider (about half the width) and mostly in the base (photo 249);
+  pods still slightly less glossy than the case; heads now a bit large in the open case.
