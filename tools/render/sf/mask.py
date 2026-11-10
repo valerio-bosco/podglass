@@ -17,4 +17,4 @@ if __name__ == "__main__":
         m = mask(n)
         ys, xs = np.nonzero(m)
         print(n, m.shape, "bbox x", xs.min(), xs.max(), "y", ys.min(), ys.max())
-        Image.fromarray((m * 255).astype(np.uint8)).save(ff"{OUTDIR}/mask-{n}.png")
+        Image.fromarray((m * 255).astype(np.uint8)).save(f"{OUTDIR}/mask-{n}.png")
