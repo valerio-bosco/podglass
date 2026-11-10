@@ -23,3 +23,10 @@ One entry per task: date, task id, model, what was done, what could not be verif
 - policy.py: extra rules (retry cooldown, user-disconnect lock, card timeout) are listed in
   PLAN.md 3.2; `pause_media` is emitted on any pod removal, media.py must pause only players that
   are playing and resume only those.
+
+## 2026-11-10 - phase 4, P4.0-P4.4 (Opus, closing an interrupted session)
+- Committed the UI written on 2026-11-09: demo_state.py, shell, Theme, Strings, DaemonClient,
+  card, popover, battery widget, edit mode, components, placeholder SVGs, screenshots in docs/screens.
+- Not re-run in this session (low-cost close): screenshots are from the previous session.
+- Human check pending: compare docs/screens with the mockup page.
+- P4.5 EditMode left open: code exists but there is no screenshot or recorded test of drag/snap/save.

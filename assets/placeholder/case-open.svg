@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 230" width="240" height="230">
+<defs>
+<linearGradient id="gBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#eef0f3"/><stop offset="1" stop-color="#d4d8de"/></linearGradient>
+<linearGradient id="gSide" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff" stop-opacity=".9"/><stop offset=".25" stop-color="#ffffff" stop-opacity="0"/><stop offset=".85" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity=".08"/></linearGradient>
+<linearGradient id="gLid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfbfc"/><stop offset="1" stop-color="#dfe2e7"/></linearGradient>
+<radialGradient id="gPod" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#eceef1"/><stop offset="1" stop-color="#cfd3d9"/></radialGradient>
+<radialGradient id="gShadow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#000000" stop-opacity=".35"/><stop offset="1" stop-color="#000000" stop-opacity="0"/></radialGradient>
+</defs>
+<ellipse cx="120" cy="208" rx="92" ry="12" fill="url(#gShadow)"/>
+<path d="M52 100 C50 64 58 32 80 24 L160 24 C182 32 190 64 188 100 Z" fill="url(#gLid)"/>
+<path d="M62 98 C61 68 68 40 86 34 L154 34 C172 40 179 68 178 98" fill="none" stroke="#000000" stroke-opacity=".07" stroke-width="2"/>
+<rect x="104" y="88" width="32" height="7" rx="3.5" fill="#b9bdc4"/>
+<rect x="44" y="88" width="152" height="36" rx="18" fill="#f2f3f5"/>
+<ellipse cx="94" cy="104" rx="24" ry="8" fill="#c8ccd2"/>
+<ellipse cx="146" cy="104" rx="24" ry="8" fill="#c8ccd2"/>
+<g transform="rotate(-14 94 86)"><ellipse cx="94" cy="86" rx="21" ry="17" fill="url(#gPod)"/><ellipse cx="86" cy="80" rx="7" ry="5" fill="#2b2e33"/><ellipse cx="102" cy="94" rx="9" ry="6" fill="#e3e6ea"/></g>
+<g transform="rotate(14 146 86)"><ellipse cx="146" cy="86" rx="21" ry="17" fill="url(#gPod)"/><ellipse cx="154" cy="80" rx="7" ry="5" fill="#2b2e33"/><ellipse cx="138" cy="94" rx="9" ry="6" fill="#e3e6ea"/></g>
+<path d="M40 112 Q40 104 48 104 L192 104 Q200 104 200 112 L200 166 Q200 200 166 200 L74 200 Q40 200 40 166 Z" fill="url(#gBody)"/>
+<path d="M40 112 Q40 104 48 104 L192 104 Q200 104 200 112 L200 166 Q200 200 166 200 L74 200 Q40 200 40 166 Z" fill="url(#gSide)"/>
+<path d="M44 106 L196 106" stroke="#000000" stroke-opacity=".08"/>
+<rect x="199" y="132" width="5" height="18" rx="2" fill="#d3d6db"/>
+<circle cx="120" cy="146" r="6" fill="#30D158" opacity=".18"/><circle cx="120" cy="146" r="2.6" fill="#30D158"/>
+<g fill="#9aa0a8" opacity=".6"><circle cx="96" cy="194" r="1"/><circle cx="101" cy="195" r="1"/><circle cx="106" cy="195.5" r="1"/><circle cx="134" cy="195.5" r="1"/><circle cx="139" cy="195" r="1"/><circle cx="144" cy="194" r="1"/></g>
+</svg>

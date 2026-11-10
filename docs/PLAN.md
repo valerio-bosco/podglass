@@ -329,25 +329,25 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
 
 ### Phase 4 - UI (can start after P1.1 using `tools/demo_state.py`)
 
-- [ ] **P4.0 demo_state.py** - Model: Haiku - prints state JSON lines for scripted scenarios
+- [x] **P4.0 demo_state.py** - Model: Haiku - prints state JSON lines for scripted scenarios
   (`lid-open-disconnected`, `connecting`, `connected`, `low-battery`, `one-pod`, `setup`) with
   delays, so the UI can be built without hardware: `podglass watch` is replaced by it when
   `PODGLASS_DEMO=<scenario>` is set.
-- [ ] **P4.1 shell skeleton** - Model: Sonnet - Read: docs/UI.md, section 3.3, `~/Projects/oring/ui/shell.qml` (pattern)
+- [x] **P4.1 shell skeleton** - Model: Sonnet - Read: docs/UI.md, section 3.3, `~/Projects/oring/ui/shell.qml` (pattern)
   - Do: `shell.qml`, `Theme.qml` (singleton, tokens from UI.md, light/dark), `Strings.qml`,
     `DaemonClient.qml` (Process + SplitParser, exposes `state` and `send(cmd)`), `IpcHandler`
     target `podglass` with `showCard()`, `togglePopover()`, `edit()`.
   - Done when: `quickshell -p ui/shell.qml` starts with no QML warnings in the log.
-- [ ] **P4.2 ProximityCard.qml** - Model: Sonnet - Read: docs/UI.md "Card"
+- [x] **P4.2 ProximityCard.qml** - Model: Sonnet - Read: docs/UI.md "Card"
   - States: `setup`, `disconnected` (Connect button), `connecting` (spinner), `connected` (rings),
     `error`. Render on top (`Render.qml` picks webp or placeholder svg). Enter/exit animation.
   - Done when (verification without hardware): for each demo scenario,
     `PODGLASS_DEMO=<s> quickshell -p ui/shell.qml & sleep 3; grim docs/screens/card-<s>.png`.
   - Human check: compare screenshots with the mockup page.
-- [ ] **P4.3 ListeningPopover.qml** - Model: Sonnet - Read: docs/UI.md "Popover"
+- [x] **P4.3 ListeningPopover.qml** - Model: Sonnet - Read: docs/UI.md "Popover"
   - Close on outside click (`HyprlandFocusGrab`) and on Esc. Mode buttons send `set mode`; the
     selected state follows the daemon echo, not the click (optimistic highlight for max 2 s).
-- [ ] **P4.4 BatteryWidget.qml** - Model: Sonnet - only when `battery_widget = true`.
+- [x] **P4.4 BatteryWidget.qml** - Model: Sonnet - only when `battery_widget = true`.
 - [ ] **P4.5 EditMode.qml** - Model: Sonnet - Read: docs/UI.md "Edit mode"
   - Full-screen dim, ghost of card/widget/popover, drag with 8 px grid and snap guides at edges and
     centers (12 px threshold), toolbar Reset / Cancel / Done, writes `layout.json` (via

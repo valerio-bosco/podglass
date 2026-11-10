@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 52" width="40" height="52">
+<defs>
+<linearGradient id="gBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#eef0f3"/><stop offset="1" stop-color="#d4d8de"/></linearGradient>
+<linearGradient id="gSide" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff" stop-opacity=".9"/><stop offset=".25" stop-color="#ffffff" stop-opacity="0"/><stop offset=".85" stop-color="#000000" stop-opacity="0"/><stop offset="1" stop-color="#000000" stop-opacity=".08"/></linearGradient>
+<linearGradient id="gLid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfbfc"/><stop offset="1" stop-color="#dfe2e7"/></linearGradient>
+<radialGradient id="gPod" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#eceef1"/><stop offset="1" stop-color="#cfd3d9"/></radialGradient>
+<radialGradient id="gShadow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#000000" stop-opacity=".35"/><stop offset="1" stop-color="#000000" stop-opacity="0"/></radialGradient>
+</defs>
+<g transform="translate(40 0) scale(-1 1)"><ellipse cx="17" cy="15" rx="12" ry="11" fill="url(#gPod)"/>
+<ellipse cx="9" cy="18" rx="6" ry="7" fill="#dde0e4"/>
+<ellipse cx="20" cy="10" rx="4" ry="3" fill="#2b2e33"/>
+<rect x="20" y="18" width="8" height="31" rx="4" fill="url(#gPod)" transform="rotate(-8 24 33)"/>
+<rect x="22.6" y="43" width="7" height="5" rx="2.5" fill="#9aa0a8" transform="rotate(-8 24 33)"/></g>
+</svg>
