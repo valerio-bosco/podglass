@@ -78,9 +78,9 @@ def test_in_ear_bits(status, left, right):
 
 
 def test_lid_bits():
-    a = parse(payload(status=0x60, lid=0x05))
+    a = parse(payload(status=0x74, lid=0x05))
     assert (a.lid_open, a.lid_known, a.lid_counter) == (True, True, 5)
-    a = parse(payload(status=0x60, lid=0x0B))
+    a = parse(payload(status=0x74, lid=0x0B))
     assert (a.lid_open, a.lid_counter) == (False, 3)
 
 
@@ -92,8 +92,9 @@ def test_pod_count_bits_do_not_change_other_fields():
     base = parse(payload(status=0x20))
     for bit in (0x10, 0x04):
         a = parse(payload(status=0x20 | bit))
-        assert (a.left, a.right, a.left_in_ear, a.right_in_ear, a.lid_known) == (
-            base.left, base.right, base.left_in_ear, base.right_in_ear, base.lid_known)
+        assert (a.left, a.right, a.left_in_ear, a.right_in_ear) == (
+            base.left, base.right, base.left_in_ear, base.right_in_ear)
+        assert a.lid_known is True  # a pod in the case makes the lid bit valid
 
 
 def test_pairing_mode_only_model():
@@ -135,3 +136,25 @@ def test_fixtures_parse():
             if line.strip():
                 rec = json.loads(line)
                 parse_advert(bytes.fromhex(rec["hex"]), rec["rssi"], rec["addr"])
+
+
+def test_lid_known_while_any_pod_in_case():
+    # real status bytes from tests/fixtures/adv: 0x15 both in case, 0x31 one out, 0x2b both in ears
+    assert parse(payload(status=0x15)).lid_known is True
+    assert parse(payload(status=0x31)).lid_known is True
+    assert parse(payload(status=0x2B)).lid_known is False
+
+
+def test_parse_precise_real_payloads():
+    from podglass.adv import parse_precise
+
+    # decrypted from fixtures; AAP reported left 53, right 44, case 1 at the same time
+    p = parse_precise(bytes.fromhex("04b5ac01c82000bc8f5d000341cebc33"), primary_left=True)
+    assert (p.left, p.right, p.case) == (53, 44, 1)
+    assert (p.left_charging, p.right_charging, p.case_charging, p.busy) == (True, True, False, False)
+    assert p.host_tail == bytes.fromhex("c82000")
+    p = parse_precise(bytes.fromhex("04acb501c82000bc8f5d000341cebc33"), primary_left=False)
+    assert (p.left, p.right) == (53, 44)
+    p = parse_precise(bytes.fromhex("052c34ff6a7bb6000000071 4be3a63a7".replace(" ", "")), primary_left=False)
+    assert (p.left, p.right, p.case, p.busy) == (52, 44, None, True)
+    assert parse_precise(b"\x04", True) is None

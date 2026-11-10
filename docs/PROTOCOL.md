@@ -32,7 +32,7 @@ Filter: manufacturer data with company id `0x004C` (Apple) whose payload starts 
 | 7 | high nibble = charging flags, low nibble = case battery |
 | 8 | lid: bits 0..2 = lid open counter, bit 3 = lid state (meaningful only when "this pod in case") |
 | 9 | color |
-| 10 | connection state (meaning per value: to be recorded in phase 0, task P0.3) |
+| 10 | connection state: `04` idle (seen also during a call), `05` audio streaming. Same value as decrypted byte 0 |
 | last 16 | encrypted payload (exact battery, see 1.3) |
 
 Model ids (value of `data[3] << 8 | data[4]`):
@@ -80,8 +80,8 @@ left_in_ear    = (s & 0x08) if xor else (s & 0x02)
 right_in_ear   = (s & 0x02) if xor else (s & 0x08)
 
 lid_counter = data[8] & 0x07
-lid_open    = ((data[8] >> 3) & 0x01) == 0   # VERIFY in P0.3: confirm which value means open
-lid_known   = this_in_case
+lid_open    = ((data[8] >> 3) & 0x01) == 0   # verified 2026-11-10
+lid_known   = (s & 0x14) != 0                # verified: valid while any pod is in the case
 ```
 
 ### 1.1 Which AirPods are mine (RPA resolution)
@@ -117,9 +117,22 @@ RSSI > -60 dBm counts as "probably mine" and the card shows a "Connect" button, 
 ### 1.3 Exact battery from the encrypted payload
 
 `plain = AES-128-CBC-decrypt(key=enc_key, iv=16 zero bytes, data=last 16 bytes)` (key used as is,
-no reversal). The layout of `plain` is not documented yet: task P0.3 records pairs of
-(plain, exact battery from AAP) so the layout can be worked out. Until then the UI shows coarse
-battery from the advertisement and exact battery from AAP when connected.
+no reversal). Layout verified on 2026-11-10 against AAP battery (`adv.parse_precise`):
+
+| Byte | Meaning |
+|---|---|
+| 0 | connection state, same as advert offset 10 (`05` = streaming audio) |
+| 1 | primary pod battery: bit 7 = charging, bits 0-6 = percent, `FF` = unknown |
+| 2 | secondary pod battery, same format |
+| 3 | case battery, same format (`FF` when no pod is in the case) |
+| 4..6 | last 3 bytes of the MAC of the host the AirPods are bound to (this PC: `c8 20 00`; the iPhone: another value) |
+| 7..9 | last 3 bytes of the AirPods' own public MAC while in the case, else zero |
+| 10.. | changing values, unknown |
+
+Primary = left when status bit 5 is set (same rule as the coarse battery).
+
+This gives exact battery **without connecting**, and "who owns the AirPods now": host bytes not
+equal to our adapter + byte 0 `05` = in use on another device (do not auto-connect).
 
 ---
 

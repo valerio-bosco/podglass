@@ -22,7 +22,7 @@
 
       devShells = forAll (pkgs: {
         default = pkgs.mkShell {
-          packages = [ (pythonFor pkgs) pkgs.quickshell pkgs.playerctl pkgs.libwebp ];
+          packages = [ (pythonFor pkgs) pkgs.quickshell pkgs.playerctl pkgs.libwebp pkgs.libnotify ];
         };
         # Blender is large: only for the render tasks (phase 3)
         render = pkgs.mkShell {

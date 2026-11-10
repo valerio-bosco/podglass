@@ -199,7 +199,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
     it goes) into `docs/SPIKE.md`. **Do not edit /etc/nixos.**
   - Human check: the user adds it and runs `sudo nixos-rebuild switch`; then
     `busctl introspect org.bluez /org/bluez/hci0 | grep AdvertisementMonitorManager1` prints a line.
-- [ ] **P0.2 BLE capture tool** - Model: Sonnet - Depends: P1.1 - Read: PROTOCOL.md section 1
+- [x] **P0.2 BLE capture tool** - Model: Sonnet - Depends: P1.1 - Read: PROTOCOL.md section 1
   - Do: `tools/capture_ble.py --label <text> --seconds N --out tests/fixtures/adv/<label>.jsonl`:
     bleak scanner, keep only Apple `0x004C` payloads starting with `07`, write
     `{"t", "addr", "rssi", "hex", "label"}` per line. Try passive mode (BlueZ advertisement monitor
@@ -208,7 +208,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
   - Human check: the user runs the capture script in `docs/SPIKE.md` (10 labeled steps: case closed,
     lid open, lid open with one pod out, both pods in ears, one pod out of ear, case charging, lid
     closed, AirPods playing on the iPhone, in a call on the iPhone, far away).
-- [ ] **P0.3 Pair + AAP capture** - Model: Sonnet - Depends: P0.2 - Read: PROTOCOL.md section 2
+- [x] **P0.3 Pair + AAP capture** - Model: Sonnet - Depends: P0.2 - Read: PROTOCOL.md section 2
   - Do: `tools/capture_aap.py <MAC>`: L2CAP connect to PSM 0x1001, send the startup sequence, log
     every packet both ways to `tests/fixtures/aap/session-<date>.jsonl`, interactive keys
     `1 2 3 4` = set mode off/anc/transparency/adaptive, `k` = request keys, `q` = quit. Keys found
@@ -216,7 +216,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
   - Human check: pairing (hold the case button until the light flashes white, then
     `bluetoothctl scan on; pair <MAC>; trust <MAC>; connect <MAC>`), run the tool, press every key,
     take pods out/in, listen that ANC really changes.
-- [ ] **P0.4 Read the captures** - Model: Sonnet - Depends: P0.2, P0.3 - Read: fixtures, PROTOCOL.md
+- [x] **P0.4 Read the captures** - Model: Sonnet - Depends: P0.2, P0.3 - Read: fixtures, PROTOCOL.md
   - Do: in `docs/SPIKE.md` write, from the data: which lid bit value means open; the values of
     the connection-state byte (offset 10) for: idle, playing on iPhone, call on iPhone, connected to
     this PC; whether adverts continue while connected to the PC; pairs (decrypted payload, AAP exact

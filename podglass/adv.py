@@ -91,10 +91,42 @@ def parse_advert(data: bytes, rssi: int, addr: str) -> Advert | None:
         case_charging=bool(flags & 0x04),
         left_in_ear=bool(left_in_ear),
         right_in_ear=bool(right_in_ear),
-        # VERIFY in P0.3: which value of bit 3 means open
+        # verified on hardware (docs/SPIKE.md): bit 3 clear = open; valid while any pod is in the case
         lid_open=((data[8] >> 3) & 0x01) == 0,
-        lid_known=this_in_case,
+        lid_known=bool(s & 0x14),
         lid_counter=data[8] & 0x07,
         conn_state=data[10],
         encrypted=bytes(data[-ENCRYPTED_LEN:]) if len(data) >= PAIRED_LEN + ENCRYPTED_LEN else None,
     )
+
+
+@dataclass(frozen=True)
+class Precise:
+    """Decrypted advert payload (crypto.decrypt_payload), layout in docs/PROTOCOL.md 1.3."""
+
+    left: int | None
+    right: int | None
+    case: int | None
+    left_charging: bool
+    right_charging: bool
+    case_charging: bool
+    busy: bool  # byte 0 == 0x05: audio streaming to the host below
+    host_tail: bytes  # last 3 bytes of the MAC of the host the AirPods are bound to
+
+
+def _precise_level(b: int) -> tuple[int | None, bool]:
+    if b == 0xFF:
+        return None, False
+    level = b & 0x7F
+    return (level if level <= 100 else None), bool(b & 0x80)
+
+
+def parse_precise(plain: bytes, primary_left: bool) -> Precise | None:
+    """Exact battery from the decrypted payload. Byte 1 is the primary pod, byte 2 the other."""
+    if len(plain) < 7:
+        return None
+    (p, p_chg), (q, q_chg) = _precise_level(plain[1]), _precise_level(plain[2])
+    case, case_chg = _precise_level(plain[3])
+    left, left_chg, right, right_chg = (p, p_chg, q, q_chg) if primary_left else (q, q_chg, p, p_chg)
+    return Precise(left=left, right=right, case=case, left_charging=left_chg, right_charging=right_chg,
+                   case_charging=case_chg, busy=plain[0] == 0x05, host_tail=bytes(plain[4:7]))
