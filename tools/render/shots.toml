@@ -12,8 +12,8 @@ denoise_prefilter = "FAST"
 adaptive = true
 view_transform = "AgX"
 look = "AgX - Medium High Contrast"
-exposure = 0.1
-open_angle = 105.0     # lid opening in degrees, hinge axis = Case_Lid origin (X axis)
+exposure = -0.6
+open_angle = 100.0     # lid opening in degrees, hinge axis = Case_Lid origin (X axis)
 
 [camera]
 lens = 105.0           # mm, long lens = little perspective
@@ -21,14 +21,15 @@ azimuth = -24.0        # degrees from the front towards +X (3/4 view)
 elevation = 15.0
 target = [0.0, 0.0, 2.7]
 frame_width = 8.4
-tip_tilt = 20.0        # degrees the silicone tips lean towards the center while the pods are in the case      # cm visible across the image at the target distance
+tip_tilt = 50.0        # degrees the silicone tips lean towards the center while the pods are in the case      # cm visible across the image at the target distance
 
 [light]                # area lights, positions relative to the target, in cm
-key   = { pos = [-14.0, -12.0, 16.0], size = 12.0, energy = 4000.0, color = [1.0, 0.98, 0.95] }
-fill  = { pos = [ 18.0, -22.0,  4.0], size = [3.0, 20.0], energy = 1500.0, color = [0.92, 0.95, 1.0] }
-rim   = { pos = [  6.0,  16.0,  9.0], size = 10.0, energy = 3000.0, color = [1.0, 1.0, 1.0] }
-top   = { pos = [  0.0,  -2.0, 24.0], size = 20.0, energy = 800.0, color = [1.0, 1.0, 1.0] }
-world = { ramp = [0.3, 0.7, 1.0], strength = 0.6 }   # floor / horizon / ceiling grey levels
+key   = { pos = [-14.0, -12.0, 16.0], size = 22.0, energy = 9000.0, color = [1.0, 0.98, 0.95] }
+fill  = { pos = [ 18.0, -22.0,  4.0], size = [6.0, 26.0], energy = 4000.0, color = [0.93, 0.95, 1.0] }
+strip = { pos = [-20.0, -10.0,  2.0], size = [5.0, 24.0], energy = 2500.0, color = [1.0, 0.97, 0.93] }
+rim   = { pos = [  6.0,  16.0,  9.0], size = 14.0, energy = 4500.0, color = [1.0, 1.0, 1.0] }
+top   = { pos = [  0.0,  -2.0, 24.0], size = 30.0, energy = 1800.0, color = [1.0, 1.0, 1.0] }
+world = { ramp = [0.1, 0.5, 2.5], strength = 0.8 }   # floor / horizon / ceiling grey levels
 
 [shots.case-open]
 kind = "anim"

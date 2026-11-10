@@ -16,14 +16,16 @@ import bpy
 from mathutils import Vector
 
 # ---- dimensions (cm) --------------------------------------------------------------------------
-W, D, H = 6.06, 2.17, 4.52          # case width (X), depth (Y), height (Z)
-LID_H = 1.25                        # lid height, the seam is at SEAM = H - LID_H
+W, D, H = 6.2, 2.17, 4.35          # case width (X), depth (Y), height (Z): a bit wider and lower than 60.6 x 45.2
+LID_H = H / 3                       # the seam is one third from the top: SEAM = H - LID_H
 SEAM = H - LID_H
-EDGE = 1.0                          # outer rounding radius of the case
-POD_X = 1.42                        # pod centers at +-POD_X
-POD_DROP = 0.55                     # head center sits this far below the seam
+N_FRONT, N_PLAN = 5.0, 3.4          # superellipse exponents: front view (x/z) and plan (x/y); 2 = ellipse, inf = box
+DOME = 0.07                         # the flat top and bottom faces bulge by this much
+WALL = 0.1                          # lid wall thickness
+POD_X = 1.45                        # pod centers at +-POD_X
+POD_RISE = 0.25                     # head center sits this far ABOVE the seam (heads rise out of the cavities)
 CAVITY_R = 0.95
-HINGE_Y = D / 2 - 0.2               # hinge axis (y, z = SEAM)
+HINGE_Y = D / 2 - 0.06              # hinge axis (y, z = SEAM): on the back surface, so the lid does not dig into the base
 
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = args[args.index("--out") + 1] if "--out" in args else "assets/models/airpods-pro2.blend"
@@ -99,6 +101,37 @@ def rbox(name, sx, sy, sz, r, segs=10, profile=0.6, center=(0, 0, 0)):
     return ob
 
 
+def superell(name, a, b, c, n1=N_FRONT, n2=N_PLAN, center=(0, 0, 0), dome=DOME, nlat=72, nlon=144):
+    """Superellipsoid with half sizes a, b, c: (|x/a|^n2 + |y/b|^n2)^(n1/n2) + |z/c|^n1 = 1.
+    Flat top and bottom (poles) are bulged by `dome`."""
+    e1, e2 = 2.0 / n1, 2.0 / n2
+
+    def sp(v, e):
+        return math.copysign(abs(v) ** e, v)
+    bm = bmesh.new()
+    rings = []
+    for i in range(1, nlat):
+        phi = -math.pi / 2 + math.pi * i / nlat
+        rho = sp(math.cos(phi), e1)
+        z = c * sp(math.sin(phi), e1) + math.copysign(dome * (1 - rho * rho), phi)
+        ring = [bm.verts.new((a * rho * sp(math.cos(t), e2), b * rho * sp(math.sin(t), e2), z + center[2]))
+                for t in (2 * math.pi * k / nlon for k in range(nlon))]
+        rings.append(ring)
+    for r0, r1 in zip(rings, rings[1:]):
+        for k in range(nlon):
+            bm.faces.new((r0[k], r0[(k + 1) % nlon], r1[(k + 1) % nlon], r1[k]))
+    for ring, up in ((rings[0], False), (rings[-1], True)):
+        zc = center[2] + (c + dome if up else -c - dome)
+        pole = bm.verts.new((0, 0, zc))
+        for k in range(nlon):
+            f = (ring[k], ring[(k + 1) % nlon], pole) if up else (ring[(k + 1) % nlon], ring[k], pole)
+            bm.faces.new(f)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ob = link(name, bm)
+    smooth(ob, 60)
+    return ob
+
+
 def boolean(obj, cutter, op="DIFFERENCE", keep=False):
     m = obj.modifiers.new("bool", "BOOLEAN")
     m.operation = op
@@ -149,7 +182,7 @@ def cyl(name, r, depth, loc, rot=(0, 0, 0), verts=32):
 
 
 # ---- materials -------------------------------------------------------------------------------
-def material(name, color, rough=0.3, metal=0.0, coat=0.0, coat_rough=0.05, emission=None, bump=None):
+def material(name, color, rough=0.3, metal=0.0, coat=0.0, coat_rough=0.05, emission=None, bump=None, spec=0.5, sss=None):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     nt = m.node_tree
@@ -159,6 +192,11 @@ def material(name, color, rough=0.3, metal=0.0, coat=0.0, coat_rough=0.05, emiss
     b.inputs["Metallic"].default_value = metal
     b.inputs["Coat Weight"].default_value = coat
     b.inputs["Coat Roughness"].default_value = coat_rough
+    b.inputs["Specular IOR Level"].default_value = spec
+    if sss:  # (weight, radius colour): soft translucent look of silicone
+        b.inputs["Subsurface Weight"].default_value = sss[0]
+        b.inputs["Subsurface Radius"].default_value = sss[1]
+        b.inputs["Subsurface Scale"].default_value = 0.15
     if emission:
         b.inputs["Emission Color"].default_value = (*emission[0], 1)
         b.inputs["Emission Strength"].default_value = emission[1]
@@ -174,10 +212,10 @@ def material(name, color, rough=0.3, metal=0.0, coat=0.0, coat_rough=0.05, emiss
 
 def make_materials():
     return {
-        "white": material("White gloss", (0.93, 0.93, 0.92), rough=0.22, coat=0.7, coat_rough=0.04),
-        "white_rough": material("White inside", (0.88, 0.88, 0.87), rough=0.5),
-        "grey_tip": material("Silicone tip", (0.4, 0.41, 0.42), rough=0.5),
-        "mesh": material("Mesh", (0.008, 0.008, 0.01), rough=0.85, bump=(160.0, 0.6)),
+        "white": material("White gloss", (0.95, 0.94, 0.91), rough=0.13, coat=1.0, coat_rough=0.015, spec=0.6),
+        "white_rough": material("White inside", (0.92, 0.91, 0.88), rough=0.22, coat=0.5, coat_rough=0.05),
+        "grey_tip": material("Silicone tip", (0.42, 0.43, 0.44), rough=0.4, sss=(0.35, (0.8, 0.82, 0.85))),
+        "mesh": material("Mesh", (0.03, 0.03, 0.034), rough=0.6, bump=(420.0, 0.9)),
         "steel": material("Steel", (0.78, 0.78, 0.8), rough=0.14, metal=1.0),
         "dark": material("Dark", (0.01, 0.01, 0.012), rough=0.5),
         "led": material("LED", (0.6, 1.0, 0.55), rough=0.4, emission=((0.6, 1.0, 0.55), 6.0)),
@@ -198,9 +236,9 @@ def build_case(mats):
     gap = 0.02
 
     def shell(name):
-        ob = rbox(name, W, D, H, EDGE, segs=12, profile=0.62, center=(0, 0, H / 2))
+        ob = superell(name, W / 2, D / 2, H / 2, center=(0, 0, H / 2))
         # hinge notch at the back
-        boolean(ob, rbox("notch", 2.4, 1.0, 0.6, 0.0, segs=1, center=(0, D / 2 - 0.2, SEAM)))
+        boolean(ob, rbox("notch", 2.4, 0.5, 0.5, 0.0, segs=1, center=(0, HINGE_Y, SEAM)))
         return ob
 
     # ---- base
@@ -212,10 +250,10 @@ def build_case(mats):
         for i in range(7):
             boolean(base, cyl("hole", 0.045, 1.0, (0.55 + i * 0.2, row * 0.11, 0.0), verts=12))
     boolean(base, cyl("ledcut", 0.085, 0.1, (0, -D / 2, SEAM - 0.55), rot=(math.pi / 2, 0, 0), verts=24))
-    for sx in (-1, 1):  # pod cavities: flared lathe cutters
-        prof = [(0, SEAM - 1.6), (CAVITY_R - 0.1, SEAM - 1.6), (CAVITY_R - 0.03, SEAM - 1.4),
-                (CAVITY_R, SEAM - 0.4), (CAVITY_R + 0.0, SEAM - 0.1), (CAVITY_R + 0.12, SEAM + 0.02),
-                (CAVITY_R + 0.12, SEAM + 0.3), (0, SEAM + 0.3)]
+    for sx in (-1, 1):  # pod cavities: deep cups for the stem, wider for the head, flared at the rim
+        prof = [(0, SEAM - 2.12), (0.45, SEAM - 2.12), (0.62, SEAM - 1.8), (0.64, SEAM - 1.2),
+                (0.8, SEAM - 0.75), (CAVITY_R - 0.03, SEAM - 0.35), (CAVITY_R, SEAM - 0.1),
+                (CAVITY_R + 0.1, SEAM + 0.02), (CAVITY_R + 0.1, SEAM + 0.3), (0, SEAM + 0.3)]
         c = lathe("cav", prof, steps=64)
         c.location = (sx * POD_X, 0, 0)
         boolean(base, c)
@@ -225,16 +263,15 @@ def build_case(mats):
     # ---- lid (origin later moved to the hinge axis)
     lid = shell("Case_Lid")
     boolean(lid, rbox("keep", W * 2, D * 2, LID_H * 2, 0.0, segs=1, center=(0, 0, H - LID_H + gap + LID_H)), "INTERSECT")
-    inset = 0.17
-    boolean(lid, rbox("hollow", W - 2 * inset, D - 2 * inset, 2.0, EDGE - inset, segs=10, profile=0.62,
-                      center=(0, 0, H - 0.14 - 1.0)))
+    inset = WALL
+    boolean(lid, superell("hollow", W / 2 - inset, D / 2 - inset, H / 2 - inset, center=(0, 0, H / 2), dome=DOME - 0.02))
     bevel(lid, 0.1, 2, angle=35)
     smooth(lid, 35, weighted=True)
 
     # materials
     def base_pick(p):
         c, n = p.center, p.normal
-        inside = c.z > SEAM - 1.8 and (n.z > 0.6 or math.hypot(abs(c.x) - POD_X, c.y) < CAVITY_R + 0.15)
+        inside = c.z > SEAM - 2.2 and (n.z > 0.6 or math.hypot(abs(c.x) - POD_X, c.y) < CAVITY_R + 0.15)
         if c.z < 0.9 and abs(c.y) < 0.3 and (-1.0 < c.x < 0.0 or 0.4 < c.x < 2.2) and c.z > 0.02:
             return 2  # port and speaker holes
         return 1 if inside else 0
@@ -250,7 +287,7 @@ def build_case(mats):
 
 
 def build_hardware(mats, lid):
-    hinge = cyl("Case_Hinge", 0.15, 2.25, (0, HINGE_Y, SEAM), rot=(0, math.pi / 2, 0), verts=40)
+    hinge = cyl("Case_Hinge", 0.1, 2.3, (0, HINGE_Y, SEAM), rot=(0, math.pi / 2, 0), verts=40)
     bevel(hinge, 0.02, 2, angle=40)
     smooth(hinge, 40)
     hinge.data.materials.append(mats["steel"])
@@ -344,7 +381,7 @@ def main():
     hinge, led, loop = build_hardware(mats, lid)
     for sx, nm in ((-1, "Pod_L"), (1, "Pod_R")):
         pod = build_pod(nm, mats)
-        pod.location = (sx * POD_X, 0.0, SEAM - POD_DROP)
+        pod.location = (sx * POD_X, 0.0, SEAM + POD_RISE)
     bpy.ops.wm.save_as_mainfile(filepath=OUT)
     print("saved", OUT)
 

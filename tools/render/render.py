@@ -138,8 +138,9 @@ def setup_scene():
     cam.data.clip_end = 1000.0
 
     lights = {}
-    for name in ("key", "fill", "rim", "top"):
-        c = LIGHT[name]
+    for name, c in LIGHT.items():
+        if name == "world":
+            continue
         ld = bpy.data.lights.new(name, "AREA")
         if isinstance(c["size"], list):  # strip softbox: [width, height]
             ld.shape = "RECTANGLE"
@@ -223,6 +224,7 @@ def encode(frames, dst):
 def main():
     sc, cam, lights, floor = setup_scene()
     build_rig()
+    home = {n: tuple(bpy.data.objects[n].location) for n in ("Pod_L", "Pod_R")}  # in-case pose from model.py
     names = [k for k, v in cfg["shots"].items() if not v.get("debug")] if WANT == "all" else WANT.split(",")
     OUT.mkdir(parents=True, exist_ok=True)
     produced = {}
@@ -232,7 +234,7 @@ def main():
         # reset pose of the two pods to the in-case pose (shot "place" overrides them)
         for n in ("Pod_L", "Pod_R"):
             o = bpy.data.objects[n]
-            o.location = (-1.42 if n == "Pod_L" else 1.42, 0.0, 4.52 - 1.35 - 0.2)
+            o.location = home[n]
             o.rotation_euler = (0, 0, 0)
             bpy.data.objects[n + "_TipRig"].rotation_euler = (0, (1 if n.endswith("_L") else -1) * math.radians(shot.get("tip_tilt", CAM.get("tip_tilt", 20.0))), 0)
         only = shot.get("only")

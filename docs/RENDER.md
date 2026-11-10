@@ -37,7 +37,7 @@ Use `--samples 16-24` and `--scale 0.5` while iterating.
 
 | File | What |
 |---|---|
-| `case-open.webp` | 560x460, 48 frames, 33 ms: lid opens 0 to 105 degrees (smoothstep), case standing, 3/4 front view |
+| `case-open.webp` | 560x460, 48 frames, 33 ms: lid opens 0 to 100 degrees (smoothstep), case standing, 3/4 front view |
 | `idle.webp` | 560x460, 120 frames, loop: open case, slow yaw of +-8 degrees (starts and ends at 0, so it continues the last frame of `case-open`) |
 | `case-closed.png` | 560x460 still, lid closed, same camera |
 | `pods-pair.png` | 176x176 (2x of 88), both pods, stems down, tips leaning inward |
@@ -49,29 +49,28 @@ All have a transparent background; the floor shadow of the case shots is baked i
 
 ## The model (`model.py`)
 
-Units: 1 unit = 1 cm. Case 6.06 x 2.17 x 4.52 (W x D x H, from 60.6 x 21.7 x 45.2 mm), standing on z = 0,
-hinge at the back (+Y), camera in front (-Y). Objects: `Case_Base`, `Case_Lid` (origin on the hinge axis,
+Units: 1 unit = 1 cm. Case 6.2 x 2.17 x 4.35 (W x D x H; a superellipsoid, squircle in plan and front view, slightly domed flat faces, seam one third from the top), standing on z = 0,
+hinge on the back surface at the seam (+Y, no overlap when open), camera in front (-Y). Objects: `Case_Base`, `Case_Lid` (origin on the hinge axis,
 open it by rotating about X by a negative angle), `Case_Hinge` (steel barrel in a notch), `Case_LED`
 (emissive), `Case_Loop` (lanyard ring in a pocket on the right side), `Pod_L`/`Pod_R` (empties; children
 body+stem, `_TipRig` > silicone tip and black mesh, vents, steel contacts, stem sensor flat). The bottom
 has a Lightning slot and a speaker grille (not visible in the shots, but modelled).
-Materials: glossy white (clearcoat), rougher white inside, grey silicone tip, black mesh (bump pattern),
+Materials: glossy warm white (roughness 0.13, full clearcoat), slightly rougher white inside, light grey translucent silicone tip (subsurface), dark grey fine mesh (bump pattern),
 polished steel. Shapes are bevelled boxes / surfaces of revolution with weighted normals, no low-poly look.
 
-Constants at the top of `model.py` (case size, rounding `EDGE`, lid height `LID_H`, pod position and
-tilt `IN_CASE_TILT` (tips lean toward the center), cavity radius) are the first things to tweak.
+Constants at the top of `model.py` (case size, rounding `EDGE`, lid height `LID_H`, pod rise above the seam `POD_RISE` (heads and stem tops stand out of the cavities, tips lean about 50 degrees inward) (tips lean toward the center), cavity radius) are the first things to tweak.
 
 ## What to tweak (`shots.toml`)
 
 - `[render]`: `samples`, `adaptive`, `denoiser`, `exposure` (white level), `look`, `open_angle`.
 - `[camera]`: `azimuth` / `elevation` (3/4 view), `lens`, `frame_width` (zoom), `target`.
-- `[light]`: area lights `key`, `fill` (vertical strip, gives the highlight on the front face), `rim`,
+- `[light]`: large soft area lights `key`, `fill`, `strip` (vertical strip, gives the highlight on the front face), `rim`,
   `top` (position in cm relative to the case, size, energy) and the `world` gradient
   (`ramp` = grey of floor / horizon / ceiling, what the glossy plastic reflects). The floor shadow strength follows the lights.
 - Per shot: `size`, `frames`, `lid`, `yaw`, `only` (objects shown), `place` (pod position/rotation for
   the single-pod stills), `tip_tilt`, `shadow`, `out` (`"name.png:44"` adds a second size).
-- Material colours and roughness: `make_materials()` in `model.py` (white plastic roughness `0.22` and
-  coat, tip grey `0.4`).
+- Material colours and roughness: `make_materials()` in `model.py` (white plastic roughness `0.13` and
+  full clearcoat, tip grey `0.42`).
 - Shots with `debug = true` (`debug-open`, `debug-bottom`, `debug-back`) are skipped by `--shot all`.
 
 ## Known differences from the real AirPods
