@@ -151,8 +151,8 @@ Commands (`podglass set ...`, and the same verbs as `{"cmd": ...}` lines on the 
 | Input | Condition | Actions |
 |---|---|---|
 | advert from my AirPods, lid open (rising edge) | always | `show_card` |
-| advert, lid closed | card visible | `hide_card` after 1.5 s |
-| lid open, not connected | `autoconnect == "lid-open"` and AirPods not busy with another device (connection-state byte, see SPIKE.md) | `connect` |
+| advert with lid closed, or no advert for 3 s (adverts stop when the lid closes) | card visible | `hide_card` after 1.5 s |
+| lid open, not connected | `autoconnect == "lid-open"` and AirPods not busy with another device (busy = decrypted host tail is not this PC and byte 0 is `05`, PROTOCOL.md 1.3) | `connect` |
 | advert, any pod in ear, not connected | `autoconnect in ("in-ear","lid-open")`, not busy elsewhere, a local input event in the last 10 min (user is at this PC) | `connect` |
 | advert from unknown AirPods in pairing mode, RSSI > -55 | not shown in the last 5 min | `show_card(setup)` |
 | AAP ear: a pod removed while playing | `ear_pause` setting (default on) | `pause_media`; on reinsert within 60 s `resume_media` |
@@ -164,7 +164,7 @@ Commands (`podglass set ...`, and the same verbs as `{"cmd": ...}` lines on the 
 Extra rules added in P1.6 (not in the table above, needed in practice): after `connect-failed`
 no automatic connect for 30 s; after a user `disconnect` no automatic connect until both pods
 leave the ears or the lid closes; `card_timeout_s > 0` hides the card after that time; the
-"busy elsewhere" connection-state values are a constructor argument, empty until P0.4.
+"busy elsewhere" rule is defined by GATE 0 (2026-11-10): see task P1.8.
 
 The policy is a pure class: `Policy(config).step(event: Event, now: float) -> list[Action]`. No
 I/O inside. Every row above is one test in `tests/test_policy.py`.
@@ -221,11 +221,11 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
     the connection-state byte (offset 10) for: idle, playing on iPhone, call on iPhone, connected to
     this PC; whether adverts continue while connected to the PC; pairs (decrypted payload, AAP exact
     battery). Fix PROTOCOL.md where it was wrong.
-- [ ] **P0.5 Audio stutter test** - Model: user - Depends: P0.1, P0.3
+- [x] **P0.5 Audio stutter test** - Model: user - Depends: P0.1, P0.3
   - Play music on the AirPods from the PC for 2 min with `capture_ble.py` running in passive mode,
     then 2 min in active mode. Note any dropouts in SPIKE.md. Decides `scanner.py` strategy:
     passive always / active only while not streaming.
-- [ ] **GATE 0** - Model: Opus or user - review SPIKE.md, update PROTOCOL.md and section 3.2 if the
+- [x] **GATE 0** - Model: Opus or user - review SPIKE.md, update PROTOCOL.md and section 3.2 if the
   data contradicts them. Nothing in phase 2 starts before this box is ticked.
 
 ### Phase 1 - pure core (can run in parallel with phase 0 after P1.1)
@@ -271,6 +271,13 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
     `ca_duck = true`, `ca_duck_volume = 0.3`, `battery_widget = false`, `card_timeout_s = 0`
     (0 = stay while lid open), `theme = "auto"`. keys.json written atomically with mode 0600.
   - Done when: tests with a temp dir; unknown config keys are ignored with a warning.
+
+- [ ] **P1.8 Policy update after GATE 0** - Model: Sonnet - Read: SPIKE.md "Policy changes",
+  PROTOCOL.md 1.3, `podglass/policy.py`, `podglass/state.py`
+  - Do: feed `adv.parse_precise` into state (exact battery without connection, `precise: true`);
+    policy: busy elsewhere = `host_tail != adapter tail and busy`; lid closed also after 3 s of
+    advert silence; `adapter_tail` as a Policy constructor argument.
+  - Done when: tests for each new rule pass, `nix develop -c pytest -q` green.
 
 ### Phase 2 - daemon (after GATE 0)
 

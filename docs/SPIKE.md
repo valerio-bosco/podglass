@@ -37,6 +37,12 @@ AAP session in `tests/fixtures/aap/` (gitignored). Steps 9-10 need the iPhone.
 - "lid closed" also from advert silence (3 s).
 - Autoconnect on in-ear only when the owning host is this PC, or the AirPods are idle.
 
-## P0.5 audio stutter
-To be done by the user: 2 min of music with `capture_ble.py --mode passive`, then 2 min with
-`--mode active`.
+## P0.5 audio stutter - done 2026-11-10
+Music from the PC on the AirPods: 2 min passive scan (20 adverts), then 2 min active scan
+(49 adverts). The user heard no dropouts in either. Decision for `scanner.py`: passive scan
+(advertisement monitor, or-pattern `4c 00 07`) always on; active scan only as a fallback when
+the monitor API is missing.
+
+## GATE 0 - passed 2026-11-10 (Opus)
+Protocol doc updated, policy changes moved to task P1.8. Open follow-up (not blocking): check
+that adverts arrive with the lid open and the case charging (the `case-charging` step had 0).
