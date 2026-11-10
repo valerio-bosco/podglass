@@ -188,3 +188,11 @@ One entry per task: date, task id, model, what was done, what could not be verif
 - Full set on the GPU 13 min 49 s. Agent's open gaps: shallow thumb notch, hinge plate without
   slits, pod head rounder than the real egg shape, simplified interior, second mic slot missing.
   Interrupted once by an API usage limit; partial work saved as a WIP commit, then amended.
+
+## 2026-11-10 - model round 4 merged (agent on Sonnet, GPU only)
+- Pods scaled 0.88 and seated low (only head tops with the sensor show), egg-shaped head, slimmer
+  longer stem, top mic slot, deeper thumb notch, hinge plate slits, interior rim and cavity lip.
+  Full set 14 min on the GPU.
+- Coordinator review of the photo comparison: visible seam ring where the stem meets the head, a
+  translucent ring at the stem bottom, the bottom mic reads as a side dot; the thumb notch on the
+  closed case reads as a long groove, not a scoop; pod heads slightly small/less glossy than in 243.
