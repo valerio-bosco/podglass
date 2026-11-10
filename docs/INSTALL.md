@@ -70,8 +70,8 @@ new services do not fight over the socket and the AirPods:
 ```sh
 pkill -f "podglass daemon"
 pkill -x mpris-proxy
-pkill -f "quickshell.*ui/shell.qml"     # the UI started with PODGLASS_BIN
-sudo nixos-rebuild switch --flake /etc/nixos#<host>
+pkill -f "quickshell.*podglass/ui/shell.qml"   # only the podglass UI (oring also has a ui/shell.qml)
+sudo nixos-rebuild switch --flake /etc/nixos#nixos
 ```
 
 (Check what is running with `pgrep -af "podglass|mpris-proxy|quickshell"` before and after.)
