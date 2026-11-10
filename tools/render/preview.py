@@ -20,13 +20,23 @@ def opt(name, default):
 VIEW = opt("--view", "front")
 OUT = opt("--out", "/tmp/m6prev")
 MODEL = opt("--model", "assets/models/airpods-pro2.blend")
-LID = float(opt("--lid", "0"))
+LID = float(opt("--lid", "1" if VIEW.startswith("sk-") else "0"))
 # name: (px w, px h, ortho_scale cm across the larger side, camera location, camera rotation deg, hide)
 SEAM_Z = 3.0
 VIEWS = {
     "front": (800, 660, 800 * 0.00824, (0, -60, 2.24), (90, 0, 0), ()),
     "pod": (700, 900, 900 * 0.00399, (-1.6 + 0.24, -60, SEAM_Z + 0.29 - 0.78), (90, 0, 0), ("Pod_R", "Case")),
     "end": (560, 1030, 1030 * 0.0049, (60, 0, 2.29), (90, 0, 90), ()),
+    # reference reference views (assets/reference/shots): 2796x1440 at 175 px/cm, case bottom at z = 0, case centred
+    "sk-front": (2796, 1440, 2796 / 175, (0, -60, 3.65), (90, 0, 0), ()),
+    "sk-right": (2796, 1440, 2796 / 175, (60, 0, 3.65), (90, 0, 90), ()),
+    "sk-left": (2796, 1440, 2796 / 175, (-60, 0, 3.65), (90, 0, -90), ()),
+    "sk-back": (2796, 1440, 2796 / 175, (0, 60, 3.65), (90, 0, 180), ()),
+    # left pod from the back / the front (compare pod-back, pod-front); 3 cm per 600 px would be too tight: 5 cm across
+    "pod-back": (900, 900, 5.0, (-1.6, 60, 2.6), (90, 0, 180), ("Pod_R", "Case")),
+    "pod-front": (900, 900, 5.0, (-1.6, -60, 2.6), (90, 0, 0), ("Pod_R", "Case")),
+    "sk-top": (2796, 1440, 2796 / 175, (0, 0, 60), (0, 0, 0), ()),
+    "sk-bottom": (2796, 1440, 2796 / 175, (0, 0, -60), (180, 0, 0), ()),
 }
 PODONLY = ("pod",)
 

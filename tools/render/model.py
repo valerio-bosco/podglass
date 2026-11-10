@@ -434,8 +434,8 @@ def build_hardware(mats, lid):
     led.data.materials.append(mats["led"])
 
     # pairing button: a thin engraved ring on the back, 0.8 wide, 1.5 below the seam (photo 248)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.39, minor_radius=0.012, major_segments=48, minor_segments=8,
-                                     location=(0, D / 2 - 0.004, SEAM - 1.5), rotation=(math.pi / 2, 0, 0))
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.3, minor_radius=0.012, major_segments=48, minor_segments=8,
+                                     location=(0, D / 2 - 0.004, SEAM - 1.25), rotation=(math.pi / 2, 0, 0))
     btn = bpy.context.active_object
     btn.name = "Case_Button"
     btn.data.materials.append(mats["dark"])
@@ -466,8 +466,9 @@ def build_hardware(mats, lid):
 # ---- pods ------------------------------------------------------------------------------------
 # silicone tip profile (radius, z along the tip axis): a dome, widest at the head, rounding off to the opening
 # (photo 241), no neck; the last three points are the recess around the mesh
-TIP_PROF = [(0.0, 0.0), (0.53, 0.0), (0.56, 0.12), (0.56, 0.32), (0.53, 0.52), (0.46, 0.67), (0.38, 0.76),
-            (0.33, 0.76), (0.31, 0.73), (0.0, 0.73)]
+TIP_PROF = [(0.0, 0.0), (0.55, 0.0), (0.6, 0.12), (0.61, 0.3), (0.58, 0.45), (0.52, 0.56), (0.44, 0.62),
+            (0.37, 0.62), (0.33, 0.58), (0.31, 0.5), (0.31, 0.35), (0.0, 0.35)]
+# wide, flat tip with a large rounded opening (reference pod-innerfront); the mesh sits at the bottom of the opening
 TIP_TILT = 105.0  # degrees from the stem axis (up) towards the tip direction: ~20 below horizontal (photo 241)
 
 
@@ -494,7 +495,9 @@ def build_pod(name, mats):
         ring = []
         for k in range(nlon):
             t = 2 * math.pi * k / nlon
-            ring.append(bm.verts.new((sgn * cxp + hwp * math.cos(t), POD_DEPTH * hwp * math.sin(t), z)))
+            fl = min(max((-0.9 - z) / 0.5, 0.0), 1.0)          # the stem front (-y) is slightly flat (pod-outer/pod-front)
+            dy = POD_DEPTH * (1 - 0.22 * fl) if math.sin(t) < 0 else POD_DEPTH
+            ring.append(bm.verts.new((sgn * cxp + hwp * math.cos(t), dy * hwp * math.sin(t), z)))
         rings.append(ring)
     for r0, r1 in zip(rings, rings[1:]):
         for k in range(nlon):
@@ -536,14 +539,14 @@ def build_pod(name, mats):
     tip = lathe(name + "_Tip", TIP_PROF, steps=56)
     tip.data.materials.append(mats["grey_tip"])
     tip.parent = rig
-    mesh = cyl(name + "_Mesh", 0.31, 0.02, (0, 0, 0.735), verts=40)
+    mesh = cyl(name + "_Mesh", 0.3, 0.02, (0, 0, 0.36), verts=40)
     mesh.data.materials.append(mats["mesh"])
     mesh.parent = rig
 
-    # black pill slots on the head (photos 239-243): a long one facing front-up, a second on the top
+    # black pill slot on the head front (photos 239-243) facing front-up
     from mathutils import Matrix
 
-    def pill(nm, nvec, along, scl):
+    def pill(nm, nvec, along, scl, mat="dark"):
         n = Vector(nvec).normalized()
         org = n * 3.0
         ok, hit, _nn, _i = head.ray_cast(org, -n)
@@ -557,11 +560,42 @@ def build_pod(name, mats):
         o.name = name + nm
         o.rotation_euler = rot.to_euler()
         o.scale = scl
-        o.data.materials.append(mats["dark"])
+        o.data.materials.append(mats[mat])
         bpy.ops.object.shade_smooth()
         o.parent = root
     pill("_Slot", (sgn * 0.4, -0.8, 0.15), (sgn * 1.0, 0, -0.45), (0.12, 0.22, 0.025))  # photo 241
-    pill("_Slot2", (-sgn * 0.45, 0.2, 0.87), (sgn * 0.3, 1.0, 0.0), (0.075, 0.2, 0.025))
+    # long vertical mesh slot on the back of the head, over the stem (reference pod-back), 0.36 x 0.9 cm: a squircle
+    # patch projected onto the body along -rn and lifted 0.006 (so it follows the curved head/stem junction exactly)
+    rn = Vector((-sgn * 0.3, 1.0, 0.0)).normalized()
+    side = rn.cross(Vector((0, 0, 1))).normalized()
+    bmp = bmesh.new()
+    nr, ns, hx, hz, zc = 8, 40, 0.18, 0.42, -0.2
+    cen = bmp.verts.new((0, 0, 0))
+    grid = []
+    for i in range(1, nr + 1):
+        ring = []
+        for k in range(ns):
+            t = 2 * math.pi * k / ns
+            c_, s_ = math.cos(t), math.sin(t)
+            u = math.copysign(abs(c_) ** 0.5, c_) * hx * i / nr      # exponent 0.5 on the unit circle -> squircle-ish pill
+            w = math.copysign(abs(s_) ** 0.5, s_) * hz * i / nr
+            org = rn * 3.0 + side * u + Vector((0, 0, zc + w))
+            okk, loc, nrm, _ix = head.ray_cast(org, -rn)
+            v = bmp.verts.new(loc + nrm * 0.006 if okk else (0, 0, 0))
+            ring.append(v)
+        grid.append(ring)
+    for k in range(ns):
+        bmp.faces.new((cen, grid[0][k], grid[0][(k + 1) % ns]))
+    for r0, r1 in zip(grid, grid[1:]):
+        for k in range(ns):
+            bmp.faces.new((r0[k], r1[k], r1[(k + 1) % ns], r0[(k + 1) % ns]))
+    cen.co = (sum(v.co.x for v in grid[0]) / ns, sum(v.co.y for v in grid[0]) / ns, sum(v.co.z for v in grid[0]) / ns)
+    bmesh.ops.recalc_face_normals(bmp, faces=bmp.faces)
+    slot2 = link(name + "_Slot2", bmp)
+    for p_ in slot2.data.polygons:
+        p_.use_smooth = True
+    slot2.data.materials.append(mats["mesh"])
+    slot2.parent = root
 
     # force-sensor flat on the stem front (-y)
     ok, hit, _n, _i = head.ray_cast(Vector((sx0, -3.0, -1.4)), Vector((0, 1, 0)))
