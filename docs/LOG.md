@@ -178,3 +178,13 @@ One entry per task: date, task id, model, what was done, what could not be verif
 - User: shape still not faithful enough. Next round uses the user's reference photos in
   `assets/reference/` (gitignored). Known gaps: pale tips, lathe-shaped tips, stems barely visible,
   pod stills with old placement, soft highlights.
+
+## 2026-11-10 - model round 3 merged: matched to the user's reference photos (agent on Sonnet, GPU only)
+- Port is **Lightning** (photo: thin stadium slot ~1.0 x 0.3 cm, 3 speaker holes left, 1 right).
+- Measured from the photos: case 6.0 x 2.2 x 4.5 cm (front ratio 1.32), pill end profile 2.05,
+  seam at 1/3, thumb notch ~49 % width, status light 0.83 cm below the seam, pairing ring 0.8 cm,
+  hinge plate ~1/2 width, lanyard slot right end; pod head 1.76, stem 0.8 wide and 2.5 below the
+  head centre, cream tip pointing sideways ~15 deg down.
+- Full set on the GPU 13 min 49 s. Agent's open gaps: shallow thumb notch, hinge plate without
+  slits, pod head rounder than the real egg shape, simplified interior, second mic slot missing.
+  Interrupted once by an API usage limit; partial work saved as a WIP commit, then amended.
