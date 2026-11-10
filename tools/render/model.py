@@ -234,11 +234,14 @@ def assign(obj, mats, names, picker):
 
 
 def thumb_scoop():
-    """Small rounded scoop at the front center on the seam (photos 249, 244): about 1/3 of the width,
-    half of it dips into the lid edge and half into the base edge."""
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=48, ring_count=24, location=(0, -D / 2 - 0.08, SEAM))
+    """Wide shallow scoop in the base just under the seam (photos 249, 244): about half the case width
+    (3.0 cm), 0.4 cm tall, 0.2 cm deep, smooth concave."""
+    depth, b = 0.2, 0.5
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=64, ring_count=32,
+                                         location=(0, -D / 2 - b + depth, SEAM - 0.17))
     o = bpy.context.active_object
-    o.scale = (1.0, 0.38, 0.4)
+    k = math.sqrt(1 - ((b - depth) / b) ** 2)      # chord fraction at the case surface
+    o.scale = (1.5 / k, b, 0.23 / k)
     bpy.ops.object.transform_apply(scale=True)
     return o
 
@@ -293,7 +296,6 @@ def build_case(mats):
         c.scale = (1.0, 0.78, 1.0)
         c.location = (sx * POD_X, 0, 0)
         boolean(lid, c)
-    boolean(lid, thumb_scoop())
     lrec = superell("lrec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM + gap - 0.5 + 0.07), dome=0.0, nlat=8, nlon=96)
     boolean(lid, lrec)
     bevel(lid, 0.1, 2, angle=35)
