@@ -15,7 +15,11 @@ PanelWindow {
     signal command(string verb, var arg)
 
     readonly property int pad: 24
-    readonly property point pos: layout.place("popover", panel.width, panel.height, screen)
+    readonly property point placed: layout.place("popover", panel.width, panel.height, screen)
+    // keep the whole panel inside the screen with a 12 px margin
+    readonly property point pos: Qt.point(
+        Math.max(12, Math.min(placed.x, screen.width - panel.width - 12)),
+        Math.max(12, Math.min(placed.y, screen.height - panel.height - 12)))
 
     screen: Quickshell.screens[0]
     visible: open
