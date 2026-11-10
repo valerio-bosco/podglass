@@ -1,6 +1,6 @@
 from dataclasses import replace
 
-from podglass.adv import Advert
+from podglass.adv import Advert, Precise
 from podglass.config import Config
 from podglass.policy import (
     Action, AdvertSeen, Bluez, CaVolumeChanged, Command, ConnectFailed, EarChanged, InputActivity,
@@ -13,8 +13,17 @@ BASE = Advert(addr="70:81:94:0D:FB:AA", rssi=-50, model="pro2-usbc", paired=True
 
 
 
-def seen(known=True, **kw):
-    return AdvertSeen(replace(BASE, **kw), known=known)
+PC = bytes.fromhex("c82000")
+PHONE = bytes.fromhex("6a7bb6")
+
+
+def precise(host=PC, busy=False):
+    return Precise(left=53, right=44, case=1, left_charging=False, right_charging=False,
+                   case_charging=False, busy=busy, host_tail=host)
+
+
+def seen(known=True, precise=None, **kw):
+    return AdvertSeen(replace(BASE, **kw), known=known, precise=precise)
 
 
 LID_OPEN = seen(lid_open=True)
@@ -53,8 +62,8 @@ def test_lid_open_autoconnect():
 
 
 def test_lid_open_no_autoconnect_when_busy_elsewhere():
-    p = Policy(Config(autoconnect="lid-open"), busy_states=frozenset({0x0B}))
-    assert "connect" not in names(p.step(seen(lid_open=True, conn_state=0x0B), 0))
+    p = Policy(Config(autoconnect="lid-open"), adapter_tail=PC)
+    assert "connect" not in names(p.step(seen(lid_open=True, precise=precise(PHONE, busy=True)), 0))
 
 
 def test_lid_open_no_autoconnect_in_ear_mode():
@@ -78,9 +87,9 @@ def test_in_ear_no_connect_when_never_or_busy():
     p = policy(autoconnect="never")
     p.step(InputActivity(), 0)
     assert p.step(IN_EAR, 1) == []
-    p = Policy(Config(), busy_states=frozenset({0x0B}))
+    p = Policy(Config(), adapter_tail=PC)
     p.step(InputActivity(), 0)
-    assert p.step(seen(lid_known=False, left_in_ear=True, conn_state=0x0B), 1) == []
+    assert p.step(seen(lid_known=False, left_in_ear=True, precise=precise(PHONE, busy=True)), 1) == []
 
 
 def test_unknown_airpods_never_autoconnect():
@@ -189,7 +198,7 @@ def test_hide_cancelled_when_lid_reopens_within_delay():
     p.step(LID_OPEN, 0)
     p.step(LID_CLOSED, 10)
     assert names(p.step(LID_OPEN, 11)) == ["emit:lid-opened"]
-    assert p.next_deadline() is None
+    assert p.next_deadline() == 14  # only the advert-silence check is left
     assert p.step(Tick(), 12) == []
     assert p.card == "normal"
 
@@ -212,7 +221,8 @@ def test_dismiss_card():
 
 def test_card_timeout():
     p = policy(card_timeout_s=8)
-    p.step(LID_OPEN, 0)
+    for t in range(0, 9, 2):  # adverts keep coming, so only the timeout can hide the card
+        p.step(LID_OPEN, t)
     assert p.next_deadline() == 8
     assert p.step(Tick(), 8) == [Action("hide_card")]
 
@@ -254,3 +264,36 @@ def test_disconnect_restores_ducked_volume():
 
 def test_first_lid_closed_sighting_emits_nothing():
     assert policy().step(LID_CLOSED, 0) == []
+
+
+# --- GATE 0 rules (P1.8) ------------------------------------------------------------------------
+
+def test_not_busy_when_idle_on_other_host_or_streaming_to_this_pc():
+    for pr in (precise(PHONE, busy=False), precise(PC, busy=True), None):
+        p = Policy(Config(), adapter_tail=PC)
+        p.step(InputActivity(), 0)
+        assert names(p.step(seen(lid_known=False, left_in_ear=True, precise=pr), 1)) == ["connect"]
+
+
+def test_busy_needs_adapter_tail():
+    p = Policy(Config())  # adapter MAC unknown: never treat as busy
+    p.step(InputActivity(), 0)
+    assert names(p.step(seen(lid_known=False, left_in_ear=True, precise=precise(PHONE, busy=True)), 1)) == ["connect"]
+
+
+def test_silence_closes_lid_and_hides_card():
+    p = policy()
+    p.step(LID_OPEN, 0)
+    p.step(LID_OPEN, 1)
+    assert p.next_deadline() == 4
+    assert p.step(Tick(), 3.9) == []
+    assert names(p.step(Tick(), 4)) == ["emit:lid-closed", "hide_card"]
+    assert p.next_deadline() is None
+    assert names(p.step(LID_OPEN, 10)) == ["emit:lid-opened", "show_card"]
+
+
+def test_unknown_adverts_do_not_keep_card_alive():
+    p = policy()
+    p.step(LID_OPEN, 0)
+    p.step(seen(known=False, lid_open=True), 2)
+    assert names(p.step(Tick(), 3)) == ["emit:lid-closed", "hide_card"]

@@ -6,7 +6,7 @@ actions, and calls `step(Tick(), now)` at `next_deadline()` for delayed actions.
 
 from dataclasses import dataclass
 
-from .adv import Advert
+from .adv import Advert, Precise
 from .config import Config
 
 HIDE_DELAY_S = 1.5  # card stays this long after the lid closes
@@ -15,6 +15,7 @@ SETUP_REPEAT_S = 300
 USER_ACTIVE_S = 600  # a local input event this recent means the user is at this PC
 RESUME_WINDOW_S = 60  # reinsert a pod within this time to resume what was paused
 CONNECT_RETRY_S = 30  # no automatic connect this long after a failure
+SILENCE_S = 3.0  # adverts stop when the lid closes: this much silence counts as "lid closed"
 
 
 # --- inputs ---------------------------------------------------------------------------------
@@ -23,6 +24,7 @@ CONNECT_RETRY_S = 30  # no automatic connect this long after a failure
 class AdvertSeen:
     adv: Advert
     known: bool  # resolved with our IRK; False = no keys yet ("probably mine") or pairing mode
+    precise: Precise | None = None  # decrypted payload, only for known AirPods
 
 
 @dataclass(frozen=True)
@@ -79,11 +81,12 @@ def emit(name: str) -> Action:
 
 
 class Policy:
-    def __init__(self, config: Config, busy_states: frozenset[int] = frozenset()):
-        # busy_states: connection-state byte values meaning "in use by another device".
-        # Unknown until P0.4 measures them; empty = never considered busy.
+    def __init__(self, config: Config, adapter_tail: bytes | None = None):
+        # adapter_tail: last 3 bytes of this PC's Bluetooth MAC. The AirPods are "busy elsewhere"
+        # when the decrypted advert names another host and says audio is streaming (GATE 0).
         self.config = config
-        self.busy_states = busy_states
+        self.adapter_tail = adapter_tail
+        self.last_advert: float | None = None  # last advert from my AirPods
         self.connected = False
         self.connecting = False
         self.card: str | None = None  # None | normal | setup
@@ -98,14 +101,19 @@ class Policy:
         self.paused_at: float | None = None
         self.ducked = False
 
+    def _silence_at(self) -> float | None:
+        if self.card != "normal" or self.lid_open is not True or self.last_advert is None:
+            return None
+        return self.last_advert + SILENCE_S
+
     def next_deadline(self) -> float | None:
-        times = [t for t in (self.hide_at, self.timeout_at) if t is not None]
+        times = [t for t in (self.hide_at, self.timeout_at, self._silence_at()) if t is not None]
         return min(times) if times else None
 
     def step(self, event: Event, now: float) -> list[Action]:
         match event:
-            case AdvertSeen(adv=adv, known=known):
-                return self._advert(adv, known, now)
+            case AdvertSeen(adv=adv, known=known, precise=precise):
+                return self._advert(adv, known, precise, now)
             case Bluez(connected=connected):
                 return self._bluez(connected)
             case ConnectFailed():
@@ -144,14 +152,18 @@ class Policy:
         self.connecting = True
         return [Action("connect")]
 
-    def _may_autoconnect(self, adv: Advert, known: bool, now: float) -> bool:
+    def _busy_elsewhere(self, precise: Precise | None) -> bool:
+        return (precise is not None and precise.busy and self.adapter_tail is not None
+                and precise.host_tail != self.adapter_tail)
+
+    def _may_autoconnect(self, known: bool, precise: Precise | None, now: float) -> bool:
         return (known and not self.connected and not self.connecting and not self.user_disconnected
-                and now >= self.retry_after and adv.conn_state not in self.busy_states)
+                and now >= self.retry_after and not self._busy_elsewhere(precise))
 
     def _user_active(self, now: float) -> bool:
         return self.last_input is not None and now - self.last_input <= USER_ACTIVE_S
 
-    def _advert(self, adv: Advert, known: bool, now: float) -> list[Action]:
+    def _advert(self, adv: Advert, known: bool, precise: Precise | None, now: float) -> list[Action]:
         if not adv.paired:
             if adv.rssi > SETUP_RSSI and self.card is None and (
                     self.setup_shown_at is None or now - self.setup_shown_at >= SETUP_REPEAT_S):
@@ -159,6 +171,8 @@ class Policy:
                 return self._show("setup", now) + [emit("setup-available")]
             return []
 
+        if known:
+            self.last_advert = now
         out: list[Action] = []
         if adv.lid_known and adv.lid_open and self.lid_open is not True:
             self.lid_open = True
@@ -167,7 +181,7 @@ class Policy:
                 self.hide_at = None  # reopened before the card left: keep it
             elif self.card is None:
                 out += self._show("normal", now)
-            if self.config.autoconnect == "lid-open" and self._may_autoconnect(adv, known, now):
+            if self.config.autoconnect == "lid-open" and self._may_autoconnect(known, precise, now):
                 out += self._connect()
         elif adv.lid_known and not adv.lid_open and self.lid_open is not False:
             was_open = self.lid_open
@@ -182,7 +196,7 @@ class Policy:
         if not in_ear:
             self.user_disconnected = False
         elif (self.config.autoconnect in ("in-ear", "lid-open") and self._user_active(now)
-              and self._may_autoconnect(adv, known, now)):
+              and self._may_autoconnect(known, precise, now)):
             out += self._connect()
         return out
 
@@ -249,6 +263,12 @@ class Policy:
         return []
 
     def _tick(self, now: float) -> list[Action]:
+        silence = self._silence_at()
+        if silence is not None and now >= silence:
+            # no adverts: the lid was closed (they stop right after), the 3 s already count as the delay
+            self.lid_open = False
+            self.user_disconnected = False
+            return [emit("lid-closed")] + self._hide()
         deadline = self.next_deadline()
         if deadline is not None and now >= deadline:
             return self._hide()

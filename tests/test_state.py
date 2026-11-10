@@ -119,3 +119,15 @@ def test_golden_json():
 
 def test_event_json():
     assert json.loads(event_json("lid-opened")) == {"type": "event", "name": "lid-opened"}
+
+
+def test_advert_precise_battery_without_connection():
+    from podglass.adv import Precise
+
+    pr = Precise(left=53, right=44, case=1, left_charging=True, right_charging=False, case_charging=False,
+                 busy=False, host_tail=b"\x00\x00\x00")
+    s = apply_advert(DeviceState(), advert(), pr)
+    assert (s.battery.left, s.battery.right, s.battery.case, s.battery.precise) == (
+        Level(53, True), Level(44, False), Level(1, False), True)
+    connected = replace(DeviceState(connected=True), battery=BatteryState(Level(90), Level(90), Level(90), True))
+    assert apply_advert(connected, advert(), pr).battery.left.level == 90  # AAP wins while connected

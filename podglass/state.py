@@ -8,7 +8,7 @@ import json
 from dataclasses import dataclass, field, replace
 
 from . import aap
-from .adv import Advert
+from .adv import Advert, Precise
 
 
 @dataclass(frozen=True)
@@ -53,11 +53,21 @@ class DeviceState:
     ear_precise: bool = False
 
 
-def apply_advert(state: DeviceState, adv: Advert) -> DeviceState:
+def apply_advert(state: DeviceState, adv: Advert, precise: Precise | None = None) -> DeviceState:
+    """`precise` (decrypted payload) gives exact battery without a connection; AAP still wins."""
     if not adv.paired:
         return replace(state, present=True, model=adv.model)
     changes: dict = {"present": True, "model": adv.model, "primary_left": adv.primary_left}
-    if not (state.connected and state.battery.precise):
+    if state.connected and state.battery.precise:
+        pass
+    elif precise is not None:
+        changes["battery"] = BatteryState(
+            left=Level(precise.left, precise.left_charging),
+            right=Level(precise.right, precise.right_charging),
+            case=Level(precise.case, precise.case_charging),
+            precise=True,
+        )
+    else:
         changes["battery"] = BatteryState(
             left=Level(adv.left, bool(adv.left_charging)),
             right=Level(adv.right, bool(adv.right_charging)),

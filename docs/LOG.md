@@ -61,3 +61,14 @@ One entry per task: date, task id, model, what was done, what could not be verif
 - Unparsed opcodes seen at startup: 0x08, 0x0c, 0x0e, 0x17 (HID-like descriptors, contain the
   serial number), 0x2e, 0x53, 0x55, control settings 0x1b/0x35/0x3e. Raw sessions are gitignored.
 - Pending: the user runs the labeled capture script (docs/SPIKE.md) - P0.2/P0.3 human checks.
+
+## 2026-11-10 - P1.8 policy update after GATE 0 (Opus)
+- `state.apply_advert(state, adv, precise)`: exact battery from the decrypted advert, AAP still
+  wins while connected.
+- `Policy(config, adapter_tail)`: busy elsewhere = decrypted host tail != this PC and streaming;
+  `AdvertSeen.precise`. Replaces the `busy_states` argument.
+- Lid closed also after 3 s without adverts from my AirPods (hides the card at once; adverts
+  from unknown AirPods do not keep it open). Two older tests assumed time passing without adverts
+  and were updated. 156 tests pass.
+- The daemon (P2.2/P2.7) must: decrypt with keys.json, call `adv.parse_precise`, pass the result
+  to both `apply_advert` and `AdvertSeen`, and read the adapter MAC from BlueZ for `adapter_tail`.

@@ -272,7 +272,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
     (0 = stay while lid open), `theme = "auto"`. keys.json written atomically with mode 0600.
   - Done when: tests with a temp dir; unknown config keys are ignored with a warning.
 
-- [ ] **P1.8 Policy update after GATE 0** - Model: Sonnet - Read: SPIKE.md "Policy changes",
+- [x] **P1.8 Policy update after GATE 0** - Model: Sonnet - Read: SPIKE.md "Policy changes",
   PROTOCOL.md 1.3, `podglass/policy.py`, `podglass/state.py`
   - Do: feed `adv.parse_precise` into state (exact battery without connection, `precise: true`);
     policy: busy elsewhere = `host_tail != adapter tail and busy`; lid closed also after 3 s of
