@@ -118,3 +118,11 @@ One entry per task: date, task id, model, what was done, what could not be verif
 - User decision: no volume ducking while talking. `ca_duck` default is now false (config, PLAN);
   the code stays behind the option. 178 tests pass.
 - Live (read-only): playerctl sees `spotify`, wpctl reads the sink volume.
+
+## 2026-11-10 - P2.6 tray.py (Opus + user)
+- StatusNotifierItem + com.canonical.dbusmenu with dbus-fast: 22 px pods glyph as IconPixmap
+  (generated, no files), tooltip "AirPods Pro - L 82% R 80% Case 64%", radio items for the 4
+  modes, Disconnect, Edit Position. `show()` owns the name and registers with the watcher
+  (Quickshell/serpantinum), `hide()` releases it. Battery arc on the icon not done (tooltip only).
+- Live with the user: icon appeared next to Spotify, left click -> Activate, menu choices arrived
+  (transparency, anc, edit); after `hide()` the watcher dropped the item. 181 tests pass.

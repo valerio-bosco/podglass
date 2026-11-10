@@ -66,6 +66,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seconds", type=float, default=10)
     ap.add_argument("--mode", choices=["off", "transparency", "adaptive", "anc"])
 
+    tr = dsub.add_parser("tray", help="show the tray icon and print clicks")
+    tr.add_argument("--seconds", type=float, default=30)
+
     args = parser.parse_args(argv)
     from . import ipc
 
@@ -99,6 +102,10 @@ def main(argv: list[str] | None = None) -> int:
         from .aap_session import debug as aap_debug
 
         return asyncio.run(aap_debug(args.mac, args.seconds, args.mode))
+    if args.cmd == "debug" and args.what == "tray":
+        from .tray import debug as tray_debug
+
+        return asyncio.run(tray_debug(args.seconds))
     parser.print_help()
     return 0
 

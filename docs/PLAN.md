@@ -301,7 +301,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
 - [x] **P2.5 media.py** - Model: Haiku - Do: `pause()`, `resume()` via `playerctl` (remember which
   players were playing), `duck(v)`/`restore()` via `wpctl set-volume @DEFAULT_AUDIO_SINK@`.
   Done when: tests with a fake runner (subprocess calls injected).
-- [ ] **P2.6 tray.py** - Model: Sonnet
+- [x] **P2.6 tray.py** - Model: Sonnet
   - Do: StatusNotifierItem on the session bus (`org.kde.StatusNotifierItem-<pid>-1`, register with
     `org.kde.StatusNotifierWatcher`), `IconPixmap` = 22 px pods glyph with a small battery arc,
     `ToolTip` = "AirPods Pro - L 82% R 80% Case 64%", `Activate` -> `podglass popover`,
