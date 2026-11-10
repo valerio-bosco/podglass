@@ -145,3 +145,15 @@ One entry per task: date, task id, model, what was done, what could not be verif
   clipped at the right edge and shows the long firmware string (to fix in P4).
 - Verified by the user after the fixes: stem press pause/play works (with mpris-proxy), removed
   pod into the case resumes playback. P2.7 done; phase 2 complete. 183 tests pass.
+
+## 2026-11-10 - workstreams W1 and W2 merged (Opus, agents on Sonnet)
+- W1 (branch ws-w1): nix package (`podglass` wrapper with python deps, playerctl, wpctl, hyprctl on
+  PATH), `podglass ui`, home-manager module (`podglass.service`, `podglass-ui.service`, config.toml,
+  mpris-proxy), docs/INSTALL.md with the Hyprland Lua layer rule. Verified: nix build, flake check,
+  pytest, home-manager evaluation (not switched). Coordinator fix on top: the daemon finds
+  Hyprland without HYPRLAND_INSTANCE_SIGNATURE and assumes presence when it cannot ask.
+- W2 (branch ws-w2): popover clamped inside the screen, firmware shown as "Firmware 6807". Edit
+  mode checked in demo mode via IPC/keys (open, ghosts at saved positions, Reset, Done writes
+  layout.json, Cancel, Esc, card at the saved place). Not verified: mouse drag, 8 px grid, snap
+  guides, widget ghost (no way to hold a mouse button from the agent). P4.5 stays open for the user.
+- 184 tests pass on master.

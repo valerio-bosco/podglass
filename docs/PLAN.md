@@ -364,7 +364,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
 
 ### Phase 5 - package and install
 
-- [ ] **P5.1 nix/package.nix + hm-module.nix** - Model: Sonnet - Read: `~/Projects/oring/nix/*` (pattern)
+- [x] **P5.1 nix/package.nix + hm-module.nix** - Model: Sonnet - Read: `~/Projects/oring/nix/*` (pattern)
   - Must (from the P2.7 real run): put `playerctl`, `wireplumber` (wpctl) and `hyprland` (hyprctl)
     on the daemon's PATH; enable `services.mpris-proxy` (stem presses reach Spotify only through it).
   - Options: `programs.podglass.{enable, settings, batteryWidget}`; creates the systemd user service
