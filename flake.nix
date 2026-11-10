@@ -33,9 +33,18 @@
           packages = [ (pythonFor pkgs) pkgs.quickshell pkgs.playerctl pkgs.libwebp pkgs.libnotify ];
         };
         # Blender is large: only for the render tasks (phase 3)
-        render = pkgs.mkShell {
-          packages = [ pkgs.blender pkgs.libwebp ];
-        };
+        render =
+          let
+            pkgsCuda = import nixpkgs {
+              system = pkgs.stdenv.hostPlatform.system;
+              config = { allowUnfree = true; cudaSupport = true; };
+            };
+          in
+          pkgs.mkShell {
+            packages = [ pkgsCuda.blender pkgs.libwebp pkgsCuda.cudaPackages.cuda_nvcc pkgs.gcc ];
+            # Pascal (GTX 1060) has no prebuilt Cycles kernels: Blender compiles them with nvcc
+            buildInputs = [ pkgsCuda.cudaPackages.cuda_cudart pkgsCuda.cudaPackages.cuda_cccl ];
+          };
       });
     };
 }
