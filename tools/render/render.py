@@ -230,7 +230,8 @@ def encode(frames, dst):
 def main():
     sc, cam, lights, floor = setup_scene()
     build_rig()
-    home = {n: tuple(bpy.data.objects[n].location) for n in ("Pod_L", "Pod_R")}  # in-case pose from model.py
+    home = {n: (tuple(bpy.data.objects[n].location), tuple(bpy.data.objects[n].rotation_euler))
+            for n in ("Pod_L", "Pod_R")}  # in-case pose from model.py
     names = [k for k, v in cfg["shots"].items() if not v.get("debug")] if WANT == "all" else WANT.split(",")
     OUT.mkdir(parents=True, exist_ok=True)
     produced = {}
@@ -240,8 +241,7 @@ def main():
         # reset pose of the two pods to the in-case pose (shot "place" overrides them)
         for n in ("Pod_L", "Pod_R"):
             o = bpy.data.objects[n]
-            o.location = home[n]
-            o.rotation_euler = (0, 0, 0)
+            o.location, o.rotation_euler = home[n]
             bpy.data.objects[n + "_TipRig"].rotation_euler = (0, (1 if n.endswith("_L") else -1) * math.radians(shot.get("tip_tilt", CAM.get("tip_tilt", 20.0))), 0)
         only = shot.get("only")
         for o in bpy.data.objects:

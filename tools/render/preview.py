@@ -22,8 +22,10 @@ OUT = opt("--out", "/tmp/m6prev")
 MODEL = opt("--model", "assets/models/airpods-pro2.blend")
 LID = float(opt("--lid", "0"))
 # name: (px w, px h, ortho_scale cm across the larger side, camera location, camera rotation deg, hide)
+SEAM_Z = 3.0
 VIEWS = {
     "front": (800, 660, 800 * 0.00824, (0, -60, 2.24), (90, 0, 0), ()),
+    "pod": (700, 900, 900 * 0.00399, (-1.6 + 0.24, -60, SEAM_Z + 0.29 - 0.78), (90, 0, 0), ("Pod_R", "Case")),
     "end": (560, 1030, 1030 * 0.0049, (60, 0, 2.29), (90, 0, 90), ()),
 }
 PODONLY = ("pod",)
@@ -39,6 +41,12 @@ cam.data.clip_end = 500
 cam.location = loc
 cam.rotation_euler = [math.radians(a) for a in rot]
 sc.camera = cam
+for o in bpy.data.objects:
+    top = o
+    while top.parent is not None:
+        top = top.parent
+    if any(top.name.startswith(h) for h in hide):
+        o.hide_render = True
 lid = bpy.data.objects.get("Case_Lid")
 if lid:
     lid.rotation_euler = (-math.radians(100.0) * LID, 0, 0)
