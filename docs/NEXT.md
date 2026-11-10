@@ -16,7 +16,16 @@ history: everything decided so far is in `docs/PLAN.md`, `docs/SPIKE.md`, `docs/
 - User decisions: D1 build the 3D model ourselves in Blender (fallback: a model found online),
   D2 GPL-3.0-or-later, D3 autoconnect `in-ear`, D4 English UI, no volume ducking while talking.
 
-## Workstreams (can run in parallel, each in its own git worktree / branch)
+## Update 2026-11-10 afternoon
+
+W1, W2, W3 are merged into master (worktrees removed). Left: P5.2 install (user: flake input,
+podglass.nix, import, Lua layer rule, then rebuild - see docs/INSTALL.md), P5.3 checklist, P4.5
+mouse drag check, P3.2 look approval and model iterations (GPU only: `nix develop .#render`,
+docs/RENDER.md; renders go to assets/renders and ~/.local/share/podglass/renders).
+When spawning parallel agents, create worktrees with `git worktree add` from this repo first
+(agent `isolation: worktree` uses the session's current directory, which may be another repo).
+
+## Workstreams (done 2026-11-10; kept as reference)
 
 Each workstream owns its files. Do not edit files owned by another workstream, and do not edit
 `docs/PLAN.md` or `docs/LOG.md` (the coordinator merges and updates them). End with a commit on
