@@ -8,7 +8,9 @@ the back (+Y), the camera looks from the front (-Y). Objects (used by render.py 
   Case_Hinge, Case_LED, Case_Loop, Pod_L, Pod_R (empties, children: Body, Tip, Mesh, ...).
 All dimensions below are in cm and come from the real Pro 2 Lightning case (60.6 x 45.2 x 21.7 mm).
 """
+import json
 import math
+import os
 import sys
 
 import bmesh
@@ -135,6 +137,58 @@ def superell(name, a, b, c, n1=N_FRONT, n2=N_PLAN, center=(0, 0, 0), dome=DOME, 
     return ob
 
 
+def _profile():
+    here = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "tools/render"
+    return json.load(open(os.path.join(here, "profiles.json")))["front"]
+
+
+def traced_shell(name, hd_end=0.42, m=2.7, n_plan=N_PLAN, dome=DOME, nlat=96, nlon=160):
+    """Case body from two traced silhouettes. At height z the plan section is a superellipse with half-width
+    hw(z) from the front photo (249, tools/render/trace.py) and half-depth hd(z) from the end photo (245):
+    an ellipse-like pill of exponent `m` that keeps a flat end face `hd_end` deep."""
+    prof = _profile()
+    zs_t = [r[0] for r in prof]
+    hs_t = [r[1] for r in prof]
+    for _ in range(4):  # smooth the traced noise (pixel steps would show as bands in the reflections)
+        hs_t = [hs_t[0]] + [(hs_t[i - 1] + 2 * hs_t[i] + hs_t[i + 1]) / 4 for i in range(1, len(hs_t) - 1)] + [hs_t[-1]]
+
+    def hw(z):
+        z = min(max(z, 0.0), H)
+        for i in range(len(zs_t) - 1):
+            if z <= zs_t[i + 1]:
+                t = (z - zs_t[i]) / (zs_t[i + 1] - zs_t[i])
+                return hs_t[i] + t * (hs_t[i + 1] - hs_t[i])
+        return hs_t[-1]
+
+    def hd(z):
+        u = abs(2 * z / H - 1)
+        return hd_end + (D / 2 - hd_end) * (1 - u ** m) ** (1 / m)
+    e = 2.0 / n_plan
+    bm = bmesh.new()
+    rings = []
+    for i in range(nlat + 1):
+        z = H / 2 * (1 - math.cos(math.pi * i / nlat))
+        a_, b_ = hw(z), hd(z)
+        ring = []
+        for k in range(nlon):
+            t = 2 * math.pi * k / nlon
+            ring.append(bm.verts.new((a_ * math.copysign(abs(math.cos(t)) ** e, math.cos(t)),
+                                      b_ * math.copysign(abs(math.sin(t)) ** e, math.sin(t)), z)))
+        rings.append(ring)
+    for r0, r1 in zip(rings, rings[1:]):
+        for k in range(nlon):
+            bm.faces.new((r0[k], r0[(k + 1) % nlon], r1[(k + 1) % nlon], r1[k]))
+    for ring, up in ((rings[0], False), (rings[-1], True)):
+        pole = bm.verts.new((0, 0, H + dome if up else -dome))
+        for k in range(nlon):
+            f = (ring[k], ring[(k + 1) % nlon], pole) if up else (ring[(k + 1) % nlon], ring[k], pole)
+            bm.faces.new(f)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ob = link(name, bm)
+    smooth(ob, 60)
+    return ob
+
+
 def boolean(obj, cutter, op="DIFFERENCE", keep=False):
     m = obj.modifiers.new("bool", "BOOLEAN")
     m.operation = op
@@ -252,7 +306,7 @@ def build_case(mats):
     gap = 0.02
 
     def shell(name):
-        ob = superell(name, W / 2, D / 2, H / 2, center=(0, 0, H / 2))
+        ob = traced_shell(name)
         # hinge notch at the back (the steel plate sits in it)
         boolean(ob, rbox("notch", 3.2, 0.3, 0.9, 0.0, segs=1, center=(0, HINGE_Y + 0.1, SEAM)))
         return ob
