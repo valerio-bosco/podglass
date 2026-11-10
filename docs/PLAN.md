@@ -308,7 +308,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
     `ContextMenu`/menu: the 4 modes, Disconnect, Edit layout. Registered only while connected.
   - Human check: the icon appears in the serpantinum tray when the AirPods connect and leaves when
     they disconnect; click opens the popover.
-- [ ] **P2.7 daemon.py** - Model: Sonnet - wire scanner + aap + bluez + policy + ipc + tray + media.
+- [x] **P2.7 daemon.py** - Model: Sonnet - wire scanner + aap + bluez + policy + ipc + tray + media.
   - Done when: `podglass daemon --fake tests/fixtures/adv/lid-open.jsonl` replays a capture and
     `podglass watch` shows the state changing; real run documented in LOG.md.
 
@@ -364,6 +364,8 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
 ### Phase 5 - package and install
 
 - [ ] **P5.1 nix/package.nix + hm-module.nix** - Model: Sonnet - Read: `~/Projects/oring/nix/*` (pattern)
+  - Must (from the P2.7 real run): put `playerctl`, `wireplumber` (wpctl) and `hyprland` (hyprctl)
+    on the daemon's PATH; enable `services.mpris-proxy` (stem presses reach Spotify only through it).
   - Options: `programs.podglass.{enable, settings, batteryWidget}`; creates the systemd user service
     `podglass.service` (after `bluetooth.target`, `graphical-session.target`), starts the Quickshell
     UI via `exec-once` or a second user service, adds the Hyprland layer rules.

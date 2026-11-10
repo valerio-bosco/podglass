@@ -143,3 +143,5 @@ One entry per task: date, task id, model, what was done, what could not be verif
   `services.mpris-proxy`. Audio quality drop reported once; not reproduced (A2DP fine at connect).
 - UI: popover window signal `closed` clashed with PanelWindow (renamed `dismissed`); popover is
   clipped at the right edge and shows the long firmware string (to fix in P4).
+- Verified by the user after the fixes: stem press pause/play works (with mpris-proxy), removed
+  pod into the case resumes playback. P2.7 done; phase 2 complete. 183 tests pass.
