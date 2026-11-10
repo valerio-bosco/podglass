@@ -170,3 +170,11 @@ One entry per task: date, task id, model, what was done, what could not be verif
   (packaged UI). P3.0 has a first scripted version; P3.2 (user look approval) open. Agent's list of
   differences: flat matte white, pods sit low (stems hidden), guessed tip grey and mesh, tilt and
   lid angle from memory, simplified hinge, no real squircle curvature, grille/port not visible.
+
+## 2026-11-10 - model round 2 merged (agent on Sonnet, GPU only)
+- Glossy warm white with clearcoat, squircle/superellipse case 6.2 x 4.35 cm, seam at 1/3, 1 mm lid
+  wall, lid at 100 deg with a clean hinge, pods higher with tips leaning ~50 deg inward, grey SSS
+  tips, finer mesh. Still at 24 samples ~3 s; full set at 64 samples 14 min 15 s on the GTX 1060.
+- User: shape still not faithful enough. Next round uses the user's reference photos in
+  `assets/reference/` (gitignored). Known gaps: pale tips, lathe-shaped tips, stems barely visible,
+  pod stills with old placement, soft highlights.

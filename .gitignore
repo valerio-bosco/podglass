@@ -5,3 +5,4 @@ __pycache__/
 result
 .pytest_cache/
 tests/fixtures/aap/session-*.jsonl
+assets/reference/
