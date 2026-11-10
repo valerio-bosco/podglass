@@ -22,7 +22,7 @@ SEAM = H - LID_H
 N_FRONT, N_PLAN = 4.2, 3.2          # superellipse exponents: front view (x/z) and plan (x/y); 2 = ellipse, inf = box
 DOME = 0.07                         # the flat top and bottom faces bulge by this much
 WALL = 0.1                          # lid wall thickness
-POD_SCALE = 0.96                    # pod size vs the model below: head ~1.55 wide vs 6.0 case (photos 242/243)
+POD_SCALE = 0.92                    # pod size vs the model below: head ~1.55 wide vs 6.0 case (photos 242/243)
 POD_X = 1.6                        # pod centers at +-POD_X
 POD_RISE = 0.12                     # head center sits this far above the seam (only the top of the heads shows, photo 243)
 CAVITY_R = 0.95
@@ -397,16 +397,17 @@ def build_pod(name, mats):
         bpy.ops.object.transform_apply(location=True, scale=True)
     boolean(head, stem, "UNION")           # one closed surface ...
     activate(head)
-    head.data.remesh_voxel_size = 0.022      # ... re-meshed evenly, then smoothed so the joint is a fillet
+    head.data.remesh_voxel_size = 0.012      # ... re-meshed evenly, then smoothed so the joint is a fillet
     bpy.ops.object.voxel_remesh()
     sm = head.modifiers.new("fillet", "SMOOTH")
-    sm.factor = 0.8
-    sm.iterations = 14
+    sm.factor = 0.5
+    sm.iterations = 40
     apply_mod(head, sm)
     head.name = name + "_Body"
     # dark mic opening on the very bottom tip of the stem (photos 239-241)
     for p_ in head.data.polygons:
         p_.use_smooth = True
+    head.data.materials.clear()  # the boolean leaves an empty slot 0 (default grey material): drop it
     head.data.materials.append(mats["white"])
     head.parent = root
     sx0 = -sgn * STEM_OFF

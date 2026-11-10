@@ -153,6 +153,12 @@ def setup_scene():
         ob = bpy.data.objects.new(name, ld)
         sc.collection.objects.link(ob)
         lights[name] = ob
+        if c.get("pods_only"):  # light linking: this light only lights the pods (crisp highlights on the small heads)
+            coll = bpy.data.collections.new("PodsReceive")
+            for o in sc.objects:
+                if o.name.startswith("Pod_"):
+                    coll.objects.link(o)
+            ob.light_linking.receiver_collection = coll
 
     bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, 0))
     floor = bpy.context.active_object

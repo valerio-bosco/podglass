@@ -29,6 +29,7 @@ fill  = { pos = [ 18.0, -22.0,  4.0], size = [6.0, 26.0], energy = 4000.0, color
 strip = { pos = [-20.0, -10.0,  2.0], size = [5.0, 24.0], energy = 2500.0, color = [1.0, 0.97, 0.93] }
 rim   = { pos = [  6.0,  16.0,  9.0], size = 14.0, energy = 4500.0, color = [1.0, 1.0, 1.0] }
 top   = { pos = [  0.0,  -2.0, 24.0], size = 30.0, energy = 1800.0, color = [1.0, 1.0, 1.0] }
+podspec = { pos = [-12.0, -14.0, 10.0], size = [3.0, 12.0], energy = 900.0, color = [1.0, 0.98, 0.95], pods_only = true }
 world = { ramp = [0.1, 0.5, 2.5], strength = 0.8 }   # floor / horizon / ceiling grey levels
 
 [shots.case-open]
