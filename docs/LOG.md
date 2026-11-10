@@ -41,3 +41,10 @@ One entry per task: date, task id, model, what was done, what could not be verif
 - First attempts failed with `AuthenticationRejected`: the case was not in pairing mode, and
   `bluetoothctl pair` without a registered agent fails. Working recipe: agent NoInputNoOutput +
   default-agent, scan, pair while the case light flashes white.
+
+## 2026-11-10 - P0.1 BlueZ experimental (user)
+- `hardware.bluetooth.settings.General.Experimental = true;` added to /etc/nixos/configuration.nix
+  next to `programs.serpantinum.enable`; needs `sudo systemctl restart bluetooth` after rebuild
+  (nixos-rebuild did not restart bluetoothd).
+- `AdvertisementMonitorManager1` now exposed, monitor type `or_patterns`, adapter feature
+  `HardwareOffload`. P0.1 done.

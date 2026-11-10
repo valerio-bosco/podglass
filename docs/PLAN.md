@@ -194,7 +194,7 @@ The AirPods are **not paired** with this PC yet (checked 2026-11-09: `bluetoothc
 MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), BlueZ 5.87,
 `AdvertisementMonitorManager1` not exposed (experimental features off).
 
-- [ ] **P0.1 Prepare the BlueZ setting** - Model: Sonnet - Depends: - - Read: `/etc/nixos/configuration.nix`
+- [x] **P0.1 Prepare the BlueZ setting** - Model: Sonnet - Depends: - - Read: `/etc/nixos/configuration.nix`
   - Do: write the exact snippet `hardware.bluetooth.settings.General.Experimental = true;` (and where
     it goes) into `docs/SPIKE.md`. **Do not edit /etc/nixos.**
   - Human check: the user adds it and runs `sudo nixos-rebuild switch`; then
