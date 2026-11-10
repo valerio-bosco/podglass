@@ -191,10 +191,15 @@ class Daemon:
         self.step(AdvertSeen(seen.adv, seen.known, seen.precise))
 
     def on_aap(self, event: aap.AapEvent) -> None:
+        if isinstance(event, aap.Unknown):
+            log.debug("aap unknown opcode %s: %s", event.opcode, event.raw.hex())
+        elif not isinstance(event, aap.Keys):
+            log.debug("aap %s", event)
         self.state = apply_aap(self.state, event)
         self.publish()
         if isinstance(event, aap.Ear):  # the policy compares with the previous ear state itself
-            self.step(EarChanged(self.state.in_ear.left, self.state.in_ear.right))
+            pods = (event.primary, event.secondary)
+            self.step(EarChanged(pods.count("in-ear"), pods.count("in-case")))
         elif isinstance(event, aap.CaVolume):
             self.step(CaVolumeChanged(event.level))
         elif isinstance(event, aap.Keys):

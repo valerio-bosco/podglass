@@ -126,3 +126,20 @@ One entry per task: date, task id, model, what was done, what could not be verif
   (Quickshell/serpantinum), `hide()` releases it. Battery arc on the icon not done (tooltip only).
 - Live with the user: icon appeared next to Spotify, left click -> Activate, menu choices arrived
   (transparency, anc, edit); after `hide()` the watcher dropped the item. 181 tests pass.
+
+## 2026-11-10 - P2.7 daemon, first real runs (Opus + user)
+- `podglass daemon [--replay FILE] [-v]` wires everything. Replay of `lid-open.jsonl` showed advert
+  gaps up to 5.2 s with the lid open: silence fallback raised from 3 to 8 s.
+- Real run with the UI: card appeared on lid open, AirPods connected by themselves (in-ear),
+  popover shows live battery/mode, mode changes from the popover and the tray reach the AirPods.
+- Bug 1: no pause on ear removal -> `playerctl` was not on the daemon's PATH (test wrapper outside
+  `nix develop`). The package (P5.1) must put playerctl, wpctl and hyprctl on PATH.
+- Bug 2: AAP ear packets are primary/secondary and the AirPods swap the primary when it leaves the
+  ear, so left/right mapping produced fake "inserted" events. `EarChanged` now carries counts
+  (in_ear, in_case). New rule requested by the user: the removed pod going into the case while
+  the other stays in the ear resumes playback (within 60 s).
+- Bug 3: stem presses do nothing. They are AVRCP passthrough, not AAP (no opcode 0x19 seen);
+  BlueZ needs `mpris-proxy` to forward them to MPRIS players. The HM module (P5.1) must enable
+  `services.mpris-proxy`. Audio quality drop reported once; not reproduced (A2DP fine at connect).
+- UI: popover window signal `closed` clashed with PanelWindow (renamed `dismissed`); popover is
+  clipped at the right edge and shows the long firmware string (to fix in P4).

@@ -51,7 +51,7 @@ ShellRoot {
         layout: layout
         open: shell.popoverOpen && !shell.editing
         device: daemon.device
-        onClosed: shell.popoverOpen = false
+        onDismissed: shell.popoverOpen = false
         onCommand: (verb, arg) => daemon.send(verb, arg)
     }
 

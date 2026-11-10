@@ -11,7 +11,7 @@ PanelWindow {
     property bool open: false
     property alias device: panel.device
 
-    signal closed()
+    signal dismissed()
     signal command(string verb, var arg)
 
     readonly property int pad: 24
@@ -37,14 +37,14 @@ PanelWindow {
     HyprlandFocusGrab {
         windows: [win]
         active: win.open
-        onCleared: win.closed()
+        onCleared: win.dismissed()
     }
 
     PopoverView {
         id: panel
         x: win.pad
         y: win.pad
-        onClosed: win.closed()
+        onClosed: win.dismissed()
         onCommand: (verb, arg) => win.command(verb, arg)
     }
 }

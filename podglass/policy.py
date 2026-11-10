@@ -38,9 +38,9 @@ class ConnectFailed:
 
 
 @dataclass(frozen=True)
-class EarChanged:  # from AAP, while connected
-    left: bool
-    right: bool
+class EarChanged:  # from AAP, while connected. Counts, not sides: the AAP packet says primary /
+    in_ear: int        # secondary, and the AirPods swap the primary when it leaves the ear
+    in_case: int = 0
 
 
 @dataclass(frozen=True)
@@ -120,8 +120,8 @@ class Policy:
                 self.connecting = False
                 self.retry_after = now + CONNECT_RETRY_S
                 return [emit("connect-failed")]
-            case EarChanged(left=left, right=right):
-                return self._ear(left, right, now)
+            case EarChanged(in_ear=in_ear, in_case=in_case):
+                return self._ear(in_ear, in_case, now)
             case CaVolumeChanged(level=level):
                 return self._ca(level)
             case InputActivity():
@@ -215,24 +215,26 @@ class Policy:
             out.append(Action("restore_volume"))
         return out
 
-    def _ear(self, left: bool, right: bool, now: float) -> list[Action]:
-        prev, self.ear = self.ear, (left, right)
+    def _ear(self, in_ear: int, in_case: int, now: float) -> list[Action]:
+        prev, self.ear = self.ear, (in_ear, in_case)
         if prev is None:
             return []
-        removed = (prev[0] and not left) or (prev[1] and not right)
-        inserted = (not prev[0] and left) or (not prev[1] and right)
         out: list[Action] = []
-        if removed:
+        resume = False
+        if in_ear < prev[0]:
             out.append(emit("ear-out"))
             if self.config.ear_pause and self.paused_at is None:
                 self.paused_at = now
                 out.append(Action("pause_media"))
-        if inserted:
+        elif in_ear > prev[0]:
             out.append(emit("ear-in"))
-            if self.paused_at is not None:
-                if now - self.paused_at <= RESUME_WINDOW_S:
-                    out.append(Action("resume_media"))
-                self.paused_at = None
+            resume = True
+        elif in_ear >= 1 and in_case > prev[1]:
+            resume = True  # the removed pod went into the case: keep listening with the other one
+        if resume and self.paused_at is not None:
+            if now - self.paused_at <= RESUME_WINDOW_S:
+                out.append(Action("resume_media"))
+            self.paused_at = None
         return out
 
     def _ca(self, level: int) -> list[Action]:

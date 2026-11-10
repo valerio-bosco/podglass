@@ -114,29 +114,45 @@ def test_setup_card_needs_rssi_and_not_recently_shown():
 
 def test_pod_removed_pauses_and_reinsert_resumes():
     p = policy()
-    p.step(EarChanged(True, True), 0)
-    assert names(p.step(EarChanged(False, True), 10)) == ["emit:ear-out", "pause_media"]
-    assert names(p.step(EarChanged(True, True), 70)) == ["emit:ear-in", "resume_media"]
+    p.step(EarChanged(2), 0)
+    assert names(p.step(EarChanged(1), 10)) == ["emit:ear-out", "pause_media"]
+    assert names(p.step(EarChanged(2), 70)) == ["emit:ear-in", "resume_media"]
 
 
 def test_reinsert_after_window_does_not_resume():
     p = policy()
-    p.step(EarChanged(True, True), 0)
-    p.step(EarChanged(True, False), 10)
-    assert names(p.step(EarChanged(True, True), 71)) == ["emit:ear-in"]
+    p.step(EarChanged(2), 0)
+    p.step(EarChanged(1), 10)
+    assert names(p.step(EarChanged(2), 71)) == ["emit:ear-in"]
 
 
 def test_ear_pause_off():
     p = policy(ear_pause=False)
-    p.step(EarChanged(True, True), 0)
-    assert names(p.step(EarChanged(False, True), 1)) == ["emit:ear-out"]
+    p.step(EarChanged(2), 0)
+    assert names(p.step(EarChanged(1), 1)) == ["emit:ear-out"]
 
 
 def test_second_pod_out_does_not_pause_twice():
     p = policy()
-    p.step(EarChanged(True, True), 0)
-    p.step(EarChanged(False, True), 1)
-    assert names(p.step(EarChanged(False, False), 2)) == ["emit:ear-out"]
+    p.step(EarChanged(2), 0)
+    p.step(EarChanged(1), 1)
+    assert names(p.step(EarChanged(0), 2)) == ["emit:ear-out"]
+
+
+def test_removed_pod_into_case_resumes_with_the_other():
+    # real sequence from the daemon log: out/in-ear, in-case/in-ear, then the primary swaps
+    p = policy()
+    p.step(EarChanged(2, 0), 0)
+    assert names(p.step(EarChanged(1, 0), 1)) == ["emit:ear-out", "pause_media"]
+    assert names(p.step(EarChanged(1, 1), 3)) == ["resume_media"]
+    assert p.step(EarChanged(1, 1), 4) == []  # primary swap: same counts, nothing happens
+
+
+def test_both_back_in_case_does_not_resume():
+    p = policy()
+    p.step(EarChanged(1, 1), 0)
+    assert names(p.step(EarChanged(0, 1), 1)) == ["emit:ear-out", "pause_media"]
+    assert names(p.step(EarChanged(0, 2), 2)) == []
 
 
 def test_conversation_awareness_ducks_and_restores():
