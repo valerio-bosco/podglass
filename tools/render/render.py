@@ -69,8 +69,24 @@ def setup_scene():
     bpy.ops.wm.open_mainfile(filepath=MODEL)
     sc = bpy.context.scene
     sc.render.engine = R["engine"]
-    sc.cycles.samples = int(SAMPLES or R["samples"])
-    sc.cycles.use_denoising = R["denoise"]
+    cy = sc.cycles
+    cy.samples = int(SAMPLES or R["samples"])
+    cy.use_denoising = R["denoise"]
+    cy.denoiser = R.get("denoiser", "OPENIMAGEDENOISE")   # OPTIX runs on the GPU (works on Pascal)
+    cy.denoising_input_passes = R.get("denoise_passes", "RGB_ALBEDO_NORMAL")
+    cy.denoising_prefilter = R.get("denoise_prefilter", "ACCURATE")
+    cy.use_adaptive_sampling = R.get("adaptive", False)
+    cy.adaptive_threshold = R.get("adaptive_threshold", 0.02)
+    cy.adaptive_min_samples = 0
+    cy.max_bounces = 6
+    cy.diffuse_bounces = 3
+    cy.glossy_bounces = 4
+    cy.transmission_bounces = 2
+    cy.transparent_max_bounces = 4
+    cy.caustics_reflective = False
+    cy.caustics_refractive = False
+    cy.sample_clamp_indirect = 10.0
+    sc.render.use_persistent_data = True   # keep geometry/BVH between animation frames
     sc.cycles.device = pick_device()
     sc.render.threads_mode = "FIXED"
     sc.render.threads = 2  # keep the host light, the GPU does the work
@@ -110,6 +126,9 @@ def setup_scene():
     nt.links.new(ramp.outputs["Color"], bg.inputs["Color"])
     sc.world = w
 
+    dg = bpy.context.evaluated_depsgraph_get()
+    tris = sum(len(o.evaluated_get(dg).to_mesh().polygons) for o in sc.objects if o.type == "MESH")
+    print(f"polygons after modifiers: {tris}")
     cam = bpy.data.objects.new("Camera", bpy.data.cameras.new("Camera"))
     sc.collection.objects.link(cam)
     sc.camera = cam
@@ -184,7 +203,9 @@ def render_frame(sc, path, size, shadow):
     sc.render.resolution_y = max(8, int(size[1] * SCALE))
     bpy.data.objects["Floor"].hide_render = not shadow
     sc.render.filepath = str(path)
+    t = time.time()
     bpy.ops.render.render(write_still=True)
+    print(f"  render+denoise {time.time() - t:.2f}s", flush=True)
 
 
 def smoothstep(t):
@@ -213,7 +234,7 @@ def main():
             o = bpy.data.objects[n]
             o.location = (-1.42 if n == "Pod_L" else 1.42, 0.0, 4.52 - 1.35 - 0.2)
             o.rotation_euler = (0, 0, 0)
-            bpy.data.objects[n + "_TipRig"].rotation_euler = (math.radians(shot.get("tip_tilt", CAM.get("tip_tilt", 8.0))), 0, 0)
+            bpy.data.objects[n + "_TipRig"].rotation_euler = (0, (1 if n.endswith("_L") else -1) * math.radians(shot.get("tip_tilt", CAM.get("tip_tilt", 20.0))), 0)
         only = shot.get("only")
         for o in bpy.data.objects:
             top = o

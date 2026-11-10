@@ -17,11 +17,11 @@ from mathutils import Vector
 
 # ---- dimensions (cm) --------------------------------------------------------------------------
 W, D, H = 6.06, 2.17, 4.52          # case width (X), depth (Y), height (Z)
-LID_H = 1.35                        # lid height, the seam is at SEAM = H - LID_H
+LID_H = 1.25                        # lid height, the seam is at SEAM = H - LID_H
 SEAM = H - LID_H
-EDGE = 0.75                         # outer rounding radius of the case
+EDGE = 1.0                          # outer rounding radius of the case
 POD_X = 1.42                        # pod centers at +-POD_X
-POD_DROP = 0.42                     # head center sits this far below the seam
+POD_DROP = 0.55                     # head center sits this far below the seam
 CAVITY_R = 0.95
 HINGE_Y = D / 2 - 0.2               # hinge axis (y, z = SEAM)
 
@@ -200,7 +200,7 @@ def build_case(mats):
     def shell(name):
         ob = rbox(name, W, D, H, EDGE, segs=12, profile=0.62, center=(0, 0, H / 2))
         # hinge notch at the back
-        boolean(ob, rbox("notch", 2.4, 1.0, 0.76, 0.0, segs=1, center=(0, D / 2 - 0.2, SEAM)))
+        boolean(ob, rbox("notch", 2.4, 1.0, 0.6, 0.0, segs=1, center=(0, D / 2 - 0.2, SEAM)))
         return ob
 
     # ---- base
@@ -219,7 +219,7 @@ def build_case(mats):
         c = lathe("cav", prof, steps=64)
         c.location = (sx * POD_X, 0, 0)
         boolean(base, c)
-    bevel(base, 0.07, 2, angle=35)
+    bevel(base, 0.1, 2, angle=35)
     smooth(base, 35, weighted=True)
 
     # ---- lid (origin later moved to the hinge axis)
@@ -228,7 +228,7 @@ def build_case(mats):
     inset = 0.17
     boolean(lid, rbox("hollow", W - 2 * inset, D - 2 * inset, 2.0, EDGE - inset, segs=10, profile=0.62,
                       center=(0, 0, H - 0.14 - 1.0)))
-    bevel(lid, 0.07, 2, angle=35)
+    bevel(lid, 0.1, 2, angle=35)
     smooth(lid, 35, weighted=True)
 
     # materials
@@ -250,7 +250,7 @@ def build_case(mats):
 
 
 def build_hardware(mats, lid):
-    hinge = cyl("Case_Hinge", 0.17, 2.25, (0, HINGE_Y, SEAM), rot=(0, math.pi / 2, 0), verts=40)
+    hinge = cyl("Case_Hinge", 0.15, 2.25, (0, HINGE_Y, SEAM), rot=(0, math.pi / 2, 0), verts=40)
     bevel(hinge, 0.02, 2, angle=40)
     smooth(hinge, 40)
     hinge.data.materials.append(mats["steel"])
@@ -273,59 +273,64 @@ def build_hardware(mats, lid):
 
 
 # ---- pods ------------------------------------------------------------------------------------
-IN_CASE_TILT = 8.0  # degrees, tip lean towards the front while the pod sits in the case
+IN_CASE_TILT = 20.0  # degrees, tips lean towards the case center while the pods sit in the case
 TIP_TILT = 0.0  # tips are built along +z; the 'TipRig' empty tilts them (render.py sets the angle per shot)
 
 
 def build_pod(name, mats):
     root = bpy.data.objects.new(name, None)
     bpy.context.scene.collection.objects.link(root)
+    side = 1 if name.endswith("_L") else -1   # tips lean towards the case center
 
-    # head + stem as one body of revolution around the stem axis (z)
-    prof = [(0.0, -2.26), (0.13, -2.25), (0.22, -2.19), (0.26, -2.0), (0.285, -1.5), (0.34, -1.1),
-            (0.48, -0.86), (0.68, -0.66), (0.82, -0.38), (0.88, 0.0), (0.82, 0.42), (0.63, 0.74),
-            (0.34, 0.88), (0.0, 0.9)]
-    body = lathe(name + "_Body", prof, steps=56)
-    body.scale = (1.0, 0.94, 1.0)
-    body.data.materials.append(mats["white"])
-    body.parent = root
+    # head: body of revolution around the stem axis (z)
+    hprof = [(0.0, -0.95), (0.3, -0.93), (0.55, -0.8), (0.76, -0.52), (0.87, -0.1), (0.86, 0.3),
+             (0.7, 0.65), (0.4, 0.86), (0.0, 0.9)]
+    head = lathe(name + "_Head", hprof, steps=56)
+    head.scale = (1.0, 0.96, 1.0)
+    head.data.materials.append(mats["white"])
+    head.parent = root
 
-    # silicone tip: neck + dome, built along +z then tilted about x
-    tprof = [(r, z * (0.88 if z > 0.4 else 1.0)) for r, z in [(0.0, 0.4), (0.46, 0.4), (0.47, 0.95), (0.58, 1.05), (0.66, 1.2), (0.65, 1.38),
-             (0.56, 1.52), (0.42, 1.58), (0.31, 1.58), (0.3, 1.5), (0.0, 1.5)]]
-    rig = bpy.data.objects.new(name + "_TipRig", None)   # tilt the tip by rotating this about x
+    # stem: flattened (thin in y), ends inside the head
+    sprof = [(0.0, -2.26), (0.17, -2.25), (0.27, -2.18), (0.31, -2.0), (0.34, -1.5), (0.38, -1.1),
+             (0.46, -0.8), (0.5, -0.6), (0.0, -0.6)]
+    stem = lathe(name + "_Stem", sprof, steps=40)
+    stem.scale = (1.0, 0.72, 1.0)
+    stem.data.materials.append(mats["white"])
+    stem.parent = root
+
+    # silicone tip: neck + dome, built along +z; the TipRig empty tilts it about y
+    k = 0.88
+    tprof = [(r, z * (k if z > 0.4 else 1.0)) for r, z in [(0.0, 0.4), (0.46, 0.4), (0.47, 0.95), (0.58, 1.05),
+             (0.67, 1.2), (0.66, 1.38), (0.57, 1.52), (0.45, 1.58), (0.39, 1.58), (0.38, 1.5), (0.0, 1.5)]]
+    rig = bpy.data.objects.new(name + "_TipRig", None)
     bpy.context.scene.collection.objects.link(rig)
     rig.parent = root
-    rig.rotation_euler = (math.radians(IN_CASE_TILT), 0, 0)
+    rig.rotation_euler = (0, side * math.radians(IN_CASE_TILT), 0)
     tip = lathe(name + "_Tip", tprof, steps=56)
     tip.data.materials.append(mats["grey_tip"])
     tip.parent = rig
 
     # black mesh disc in the tip opening
-    mesh = cyl(name + "_Mesh", 0.29, 0.02, (0, 0, 1.505 * 0.88), verts=40)
+    mesh = cyl(name + "_Mesh", 0.37, 0.02, (0, 0, 1.505 * k), verts=40)
     mesh.data.materials.append(mats["mesh"])
     mesh.parent = rig
 
-    # small vent / mic dots on the head and the steel charging contacts at the stem end
-    for i, (x, z) in enumerate(((0.0, -0.62), (0.28, -0.7))):
-        d = cyl(f"{name}_Dot{i}", 0.06 if i else 0.11, 0.02, (0, 0, 0), verts=16)
-        d.location = (x, 0.78 if not i else 0.7, z)
-        d.rotation_euler = (math.pi / 2 - 0.35, 0, 0)
-        d.data.materials.append(mats["mesh"])
-        d.parent = root
+    # mic hole on the head, dark mic mesh and steel contacts on the stem, pressure sensor flat (front, -y)
+    d = cyl(name + "_Vent", 0.1, 0.02, (0, -0.8 * 0.96, -0.55), rot=(math.pi / 2 + 0.55, 0, 0), verts=20)
+    d.data.materials.append(mats["mesh"])
+    d.parent = root
     for sx in (-0.07, 0.07):
         c = cyl(f"{name}_Contact", 0.045, 0.02, (sx, 0, -2.255), verts=12)
         c.data.materials.append(mats["steel"])
         c.parent = root
-
-    # pressure sensor flat on the stem (a slim inset capsule on the +y face)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(0, 0.27, -1.45))
-    s = bpy.context.active_object
-    s.name = name + "_Sensor"
-    s.scale = (0.05, 0.03, 0.38)
-    s.data.materials.append(mats["white_rough"])
-    bpy.ops.object.shade_smooth()
-    s.parent = root
+    for nm, z, sc, mat in (("Mic", -2.0, (0.09, 0.04, 0.13), "mesh"), ("Sensor", -1.35, (0.05, 0.03, 0.38), "white_rough")):
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(0, -0.215, z))
+        o = bpy.context.active_object
+        o.name = f"{name}_{nm}"
+        o.scale = sc
+        o.data.materials.append(mats[mat])
+        bpy.ops.object.shade_smooth()
+        o.parent = root
     return root
 
 
