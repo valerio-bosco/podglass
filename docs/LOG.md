@@ -84,3 +84,10 @@ One entry per task: date, task id, model, what was done, what could not be verif
   already-connected as success and waits for Connected on InProgress/AlreadyConnected.
 - Verified: `--disconnect` then `--connect` -> connected=True, PipeWire sink "AirPods Pro" back as
   default output. P2.1 done.
+
+## 2026-11-10 - P2.2 scanner.py (Opus)
+- Pure `Classifier` (RPA -> public MAC cache, 1 s dedupe, decrypt + `parse_precise`, pairing-mode
+  passthrough, "probably mine" rule without keys) + `scan()` on bleak: passive monitor with
+  or-pattern `4c 00 07`, active fallback. Yields `Seen(adv, known, precise, device)`.
+- 6 tests (synthetic RPA from the Core Spec IRK, real advert header). 165 tests pass.
+- Live: `podglass debug scan` with pods in ears -> "mine", exact L84 R82, host c82000 (this PC).

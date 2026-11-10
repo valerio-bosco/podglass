@@ -286,7 +286,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
     timeout, `disconnect()`, `BatteryProvider1` export of the lowest pod level.
   - Done when: `podglass debug bluez` prints the device path and connected state.
   - Human check: `podglass debug bluez --connect` connects the AirPods and audio plays.
-- [ ] **P2.2 scanner.py** - Model: Sonnet - Read: SPIKE.md (strategy), adv.py, crypto.py
+- [x] **P2.2 scanner.py** - Model: Sonnet - Read: SPIKE.md (strategy), adv.py, crypto.py
   - Do: async generator of `Advert` for **my** AirPods only (resolved with keys.json), plus
     pairing-mode adverts; dedupe identical payloads within 1 s; strategy from SPIKE.md.
 - [ ] **P2.3 aap_session.py** - Model: Sonnet - Read: PROTOCOL.md 2, aap.py
