@@ -79,5 +79,8 @@ One entry per task: date, task id, model, what was done, what could not be verif
 - `podglass debug bluez` prints adapter `E8:48:B8:C8:20:00` (tail `c82000`, equal to the host bytes
   in the decrypted advert) and the AirPods device. 159 tests pass.
 - `--battery 42`: BlueZ exposes Battery1 Percentage 42, Source "podglass"; upower shows it.
-- Human check pending: `--connect` timed out once (AirPods probably in the closed case); retry with
-  the pods out of the case or in the ears and confirm audio plays.
+- First `--connect` timed out (AirPods in the closed case). Second try returned
+  `org.bluez.Error.InProgress` because the AirPods had connected themselves: `connect()` now treats
+  already-connected as success and waits for Connected on InProgress/AlreadyConnected.
+- Verified: `--disconnect` then `--connect` -> connected=True, PipeWire sink "AirPods Pro" back as
+  default output. P2.1 done.

@@ -281,7 +281,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
 
 ### Phase 2 - daemon (after GATE 0)
 
-- [ ] **P2.1 bluez.py** - Model: Sonnet - Read: PROTOCOL.md 3
+- [x] **P2.1 bluez.py** - Model: Sonnet - Read: PROTOCOL.md 3
   - Do: `dbus-fast` client: find the AirPods `Device1`, watch `Connected`, `connect()` with 15 s
     timeout, `disconnect()`, `BatteryProvider1` export of the lowest pod level.
   - Done when: `podglass debug bluez` prints the device path and connected state.

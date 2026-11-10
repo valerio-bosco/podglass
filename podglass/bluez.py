@@ -122,8 +122,24 @@ class Bluez:
         return bool(_val(v))
 
     async def connect(self, path: str, timeout: float = CONNECT_TIMEOUT_S) -> None:
-        """Connect all profiles. Raises BluezError or asyncio.TimeoutError."""
-        await self._call(path, DEVICE, "Connect", timeout=timeout)
+        """Connect all profiles. Raises BluezError or asyncio.TimeoutError.
+
+        Already connected is success. `InProgress` (BlueZ is already connecting, or the AirPods
+        connected themselves a moment ago) waits for Connected instead of failing.
+        """
+        if await self.is_connected(path):
+            return
+        try:
+            await self._call(path, DEVICE, "Connect", timeout=timeout)
+        except BluezError as e:
+            if e.name not in ("org.bluez.Error.InProgress", "org.bluez.Error.AlreadyConnected"):
+                raise
+            loop = asyncio.get_running_loop()
+            end = loop.time() + timeout
+            while not await self.is_connected(path):
+                if loop.time() >= end:
+                    raise asyncio.TimeoutError from e
+                await asyncio.sleep(0.5)
 
     async def disconnect(self, path: str) -> None:
         await self._call(path, DEVICE, "Disconnect", timeout=CONNECT_TIMEOUT_S)
