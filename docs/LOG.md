@@ -34,3 +34,10 @@ One entry per task: date, task id, model, what was done, what could not be verif
 ## 2026-11-10 - Nix verification (Opus)
 - `nix develop -c pytest -q`: 149 passed (after adding `pythonpath = ["."]` to pyproject.toml).
 - `nix flake check`: all checks passed. Phase 1 is now verified with the real `cryptography`.
+
+## 2026-11-10 - P0.3 pairing step (Opus + user)
+- AirPods paired, bonded, trusted and connected with BlueZ. Modalias `v004Cp2014`: Pro 2
+  **Lightning** (`pro2-lightning`), not USB-C. Matters for the 3D model (no lanyard loop).
+- First attempts failed with `AuthenticationRejected`: the case was not in pairing mode, and
+  `bluetoothctl pair` without a registered agent fails. Working recipe: agent NoInputNoOutput +
+  default-agent, scan, pair while the case light flashes white.
