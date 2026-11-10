@@ -1,0 +1,126 @@
+# Shots for tools/render/render.py. Units: cm. Same camera for every case shot so frames match.
+# The model is built by model.py (object names: Case_Base, Case_Lid, Case_Hinge, Case_LED, Case_Loop,
+# Pod_L, Pod_R).
+
+[render]
+engine = "CYCLES"
+samples = 128          # --samples overrides (use 16-32 while iterating)
+denoise = true
+view_transform = "AgX"
+look = "AgX - Medium High Contrast"
+exposure = 0.1
+open_angle = 105.0     # lid opening in degrees, hinge axis = Case_Lid origin (X axis)
+
+[camera]
+lens = 105.0           # mm, long lens = little perspective
+azimuth = -24.0        # degrees from the front towards +X (3/4 view)
+elevation = 15.0
+target = [0.0, 0.0, 2.7]
+frame_width = 8.4
+tip_tilt = 8.0         # degrees the silicone tip leans while the pod is in the case      # cm visible across the image at the target distance
+
+[light]                # area lights, positions relative to the target, in cm
+key   = { pos = [-14.0, -12.0, 16.0], size = 12.0, energy = 4000.0, color = [1.0, 0.98, 0.95] }
+fill  = { pos = [ 18.0, -22.0,  4.0], size = [3.0, 20.0], energy = 1500.0, color = [0.92, 0.95, 1.0] }
+rim   = { pos = [  6.0,  16.0,  9.0], size = 10.0, energy = 3000.0, color = [1.0, 1.0, 1.0] }
+top   = { pos = [  0.0,  -2.0, 24.0], size = 20.0, energy = 800.0, color = [1.0, 1.0, 1.0] }
+world = { ramp = [0.3, 0.7, 1.0], strength = 0.6 }   # floor / horizon / ceiling grey levels
+
+[shots.case-open]
+kind = "anim"
+frames = 48
+size = [560, 460]
+lid = [0.0, 1.0]       # lid fraction of open_angle from first to last frame (smooth ease)
+yaw = 0.0
+out = "case-open.webp"
+
+[shots.idle]
+kind = "anim"
+frames = 120
+size = [560, 460]
+lid = [1.0, 1.0]
+yaw = 8.0              # +- degrees, one sine period over the frames (loops, starts at 0)
+out = "idle.webp"
+
+[shots.case-closed]
+kind = "still"
+size = [560, 460]
+lid = 0.0
+out = "case-closed.png"
+
+[shots.case-small]
+kind = "still"
+size = [120, 120]
+lid = 0.0
+frame_width = 6.9
+target = [0.0, 0.0, 2.3]
+shadow = false
+out = ["case-small.png", "case-small-44.png:44"]
+
+[shots.pod-left]
+kind = "still"
+size = [120, 120]
+only = ["Pod_L"]
+place = { Pod_L = { loc = [0.0, 0.0, 2.3], rot = [0.0, 0.0, 70.0] } }
+azimuth = 0.0
+elevation = 6.0
+tip_tilt = 42.0
+target = [0.0, 0.0, 1.9]
+frame_width = 4.4
+shadow = false
+out = ["pod-left.png", "pod-left-44.png:44"]
+
+[shots.pod-right]
+kind = "still"
+size = [120, 120]
+only = ["Pod_R"]
+place = { Pod_R = { loc = [0.0, 0.0, 2.3], rot = [0.0, 0.0, -70.0] } }
+azimuth = 0.0
+elevation = 6.0
+tip_tilt = 42.0
+target = [0.0, 0.0, 1.9]
+frame_width = 4.4
+shadow = false
+out = ["pod-right.png", "pod-right-44.png:44"]
+
+[shots.pods-pair]
+kind = "still"
+size = [88, 88]
+only = ["Pod_L", "Pod_R"]
+place = { Pod_L = { loc = [-1.35, 0.0, 2.3], rot = [0.0, 0.0, 62.0] }, Pod_R = { loc = [1.35, 0.0, 2.3], rot = [0.0, 0.0, -62.0] } }
+azimuth = 0.0
+elevation = 6.0
+tip_tilt = 42.0
+target = [0.0, 0.0, 1.9]
+frame_width = 6.0
+shadow = false
+out = ["pods-pair.png", "pods-pair-44.png:44"]
+
+# Not part of "all": quick still of the open case for look development (--shot debug-open).
+[shots.debug-open]
+kind = "still"
+debug = true
+size = [560, 460]
+lid = 1.0
+out = "debug-open.png"
+
+[shots.debug-bottom]
+kind = "still"
+debug = true
+size = [560, 460]
+lid = 0.0
+azimuth = 55.0
+elevation = -35.0
+target = [0.0, 0.0, 1.5]
+shadow = false
+out = "debug-bottom.png"
+
+[shots.debug-back]
+kind = "still"
+debug = true
+size = [560, 460]
+lid = 1.0
+azimuth = 150.0
+elevation = 25.0
+shadow = false
+out = "debug-back.png"
