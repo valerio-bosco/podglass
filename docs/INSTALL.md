@@ -1,0 +1,101 @@
+# Installing podglass on NixOS (P5.2)
+
+podglass ships as a flake: a package, and a home-manager module that runs the daemon and the UI as
+systemd user services. Nothing here is applied automatically: you edit `/etc/nixos` yourself.
+
+## 1. Flake input (`/etc/nixos/flake.nix`)
+
+Add next to the `oring` input (and to the `outputs` arguments if inputs are listed by name):
+
+```nix
+inputs.podglass = {
+  url = "path:/home/voodoo/Projects/podglass";
+  inputs.nixpkgs.follows = "nixpkgs";
+};
+```
+
+Nix flakes only see git-tracked files: commit (or `git add`) changes in the podglass repo before
+rebuilding, then `nix flake update podglass` in `/etc/nixos` to pick up a new commit.
+
+## 2. Module (`/etc/nixos/podglass.nix`, imported like `oring.nix`)
+
+```nix
+{ pkgs, inputs, ... }:
+
+{
+  home-manager.users.voodoo = {
+    imports = [ inputs.podglass.homeManagerModules.default ];
+
+    programs.podglass = {
+      enable = true;
+      batteryWidget = false;          # true: optional battery widget on the desktop
+      settings = {
+        autoconnect = "in-ear";       # in-ear, lid-open or never
+        theme = "auto";               # auto, light or dark
+      };
+    };
+  };
+}
+```
+
+This installs `podglass`, writes `~/.config/podglass/config.toml` (only when settings are not
+empty), enables `services.mpris-proxy` (stem presses reach Spotify only through it) and creates:
+
+- `podglass.service`: `podglass daemon`, after `bluetooth.target` and `graphical-session.target`;
+- `podglass-ui.service`: `podglass ui` (Quickshell), started after the daemon.
+
+Both start with the graphical session and restart on failure.
+
+## 3. Hyprland layer rules (glass blur)
+
+Hyprland 0.56 reads Lua. Add to `/etc/nixos/hyprland-local.lua` (installed as `z-local.lua`):
+
+```lua
+-- podglass: blur behind the glass panels (namespaces podglass-card/popover/widget/edit)
+hl.layer_rule({
+    name  = "podglass-glass",
+    match = { namespace = "^podglass-.*$" },
+    blur  = true,
+    ignore_alpha = 0.3,
+})
+```
+
+The UI works without it, only the background blur is missing.
+
+## 4. Rebuild and replace the temporary run
+
+The daemon, UI and `mpris-proxy` currently run from `/tmp/claude-1000/pg`. Stop them first, so the
+new services do not fight over the socket and the AirPods:
+
+```sh
+pkill -f "podglass daemon"
+pkill -x mpris-proxy
+pkill -f "quickshell.*ui/shell.qml"     # the UI started with PODGLASS_BIN
+sudo nixos-rebuild switch --flake /etc/nixos#<host>
+```
+
+(Check what is running with `pgrep -af "podglass|mpris-proxy|quickshell"` before and after.)
+
+## 5. Check
+
+```sh
+systemctl --user status podglass podglass-ui mpris-proxy
+journalctl --user -u podglass -u podglass-ui -b
+podglass status
+```
+
+Then run the end-to-end checklist (PLAN.md section 5, P5.3). If `hyprctl` calls in the daemon log
+"no instance", the user manager lacks `HYPRLAND_INSTANCE_SIGNATURE`; the compositor config should
+run `systemctl --user import-environment HYPRLAND_INSTANCE_SIGNATURE WAYLAND_DISPLAY`
+(serpantinum normally does this).
+
+## Renders
+
+The 3D renders are not in the package (paid model, gitignored). `podglass ui` uses the placeholders
+until `$XDG_DATA_HOME/podglass/renders/manifest.json` (default `~/.local/share/podglass/renders`)
+exists; copy the contents of `assets/renders/` there and restart `podglass-ui`.
+
+## Update and uninstall
+
+Update: commit in the repo, `nix flake update podglass`, rebuild. Uninstall: remove the module
+import and rebuild; `~/.config/podglass` and `~/.local/state/podglass` (keys) are left in place.
