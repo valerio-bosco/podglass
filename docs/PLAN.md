@@ -293,7 +293,7 @@ MX Keys Mini, WH-1000XM4, MOMENTUM 4, Hue). Adapter: Realtek (manufacturer 93), 
   - Do: asyncio wrapper over the L2CAP socket (`loop.sock_recv`), startup sequence with 3 s
     timeouts, reconnect with backoff while BlueZ says connected, `send(bytes)`, async iterator of
     `AapEvent`. Store keys on first `Keys` event.
-- [ ] **P2.4 ipc.py + CLI** - Model: Sonnet (ipc), Haiku (CLI verbs) - Read: section 3.1
+- [x] **P2.4 ipc.py + CLI** - Model: Sonnet (ipc), Haiku (CLI verbs) - Read: section 3.1
   - Do: unix socket server broadcasting the latest state on connect and on every change; CLI verbs
     `daemon`, `watch`, `status`, `set ...`, `show-card`, `popover`, `edit`, `debug bluez|scan|aap`.
     `show-card`/`popover`/`edit` call `quickshell ipc -p <ui path> call podglass <fn>`.

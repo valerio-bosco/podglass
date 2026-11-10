@@ -100,3 +100,14 @@ One entry per task: date, task id, model, what was done, what could not be verif
 - 4 tests with a socketpair as fake AirPods. 169 tests pass.
 - Live: `podglass debug aap --mode transparency` then `--mode anc`: the AirPods echoed both
   modes (PROTOCOL.md 2.4 confirmed), battery L82 R82, both in ear, firmware 6807.
+
+## 2026-11-10 - P2.4 ipc.py + CLI (Opus)
+- `IpcServer` on `$XDG_RUNTIME_DIR/podglass.sock` (mode 0600): sends the latest config + state on
+  connect, broadcasts state changes and events; `parse_command` validates every verb (pure, tested).
+- CLI: `watch`, `status [--json]`, `set <verb> [arg]`, `show-card`, `popover`, `edit`, `debug ...`.
+  Change from PLAN: `show-card`/`popover`/`edit` go to the daemon, which must broadcast them as
+  events (`show-card`, `popover`, `edit`); the UI already handles those events, no quickshell ipc.
+- Bugs found by the tests: `wait_closed()` hangs while clients are open (Python 3.12+), and a
+  one-shot `podglass set` that closed with unread data reset the connection and lost the command
+  (client now half-closes and drains). 173 tests pass.
+- Not live-tested: there is no daemon yet (P2.7).
