@@ -1,9 +1,12 @@
 """IoU of our render vs the reference mask; optional row/col window. Saves an overlay (red = only ours, green = only reference)."""
-import sys
+import os, sys
 import numpy as np
 from PIL import Image
 def run(view, ours_dir="/tmp/claude-1000/m7/ours", rows=None, cols=None, tag=""):
     sf = np.asarray(Image.open(f"/tmp/claude-1000/m7/mask-{view}.png")) > 127
+    if os.environ.get("IOU_FILL"):      # silhouette = mask with its holes (dark grilles, openings) filled
+        from scipy.ndimage import binary_fill_holes
+        sf = binary_fill_holes(sf)
     ou = np.asarray(Image.open(f"{ours_dir}/{view}.png").convert("RGBA"))[..., 3] > 127
     win = np.zeros_like(sf)
     r0, r1 = rows or (0, sf.shape[0]); c0, c1 = cols or (0, sf.shape[1])

@@ -28,12 +28,13 @@ DOME = 0.07                         # the flat top and bottom faces bulge by thi
 WALL = 0.1                          # lid wall thickness
 POD_SCALE = 1.0                    # pod size vs the model below: head ~1.55 wide vs 6.0 case (photos 242/243)
 POD_X = 1.6                        # pod centers at +-POD_X
-POD_RISE = 0.29                     # head center sits this far above the seam (only the top of the heads shows, photo 243)
-POD_TILT = 15.0                     # the pods lean forward in the case: the grille faces up-front (photos 242/243)
-POD_Y = 0.12                        # the tilt swings the stems forwards: set the pods back so the front wall keeps its thickness
+POD_RISE = 0.2                      # pod root (stem axis, head centre level) sits this far above the seam
+POD_TILT = 20.0                     # the pods lean forward in the case (the reference pose does not fit: head+tip are 2.0 deep, the case 2.0 inside)
+POD_YAW = 30.0                      # the tips turn towards the case centre (rotation about z, deg, mirrored for the right pod)
+POD_Y = -0.15                       # centres the 1.55 deep tilted pod between the walls
 POD_DEPTH = 0.93                    # pod depth / width (photos 239/240 vs 242)
 CAVITY_R = 0.95
-STEM_OFF = 0.42                     # the stem axis sits this far outwards of the head axis (photo 241)
+STEM_OFF = 0.12                     # the stem axis sits this far outwards of the head axis (photo 241)
 LED_DROP = 0.83                     # status light below the seam (photo 249: 18% of the case height)
 # lid hinge axis (x direction): fitted to the open lid of the reference end view (121 deg open, IoU 0.95):
 # just behind the back surface and 0.3 above the seam
@@ -42,6 +43,8 @@ HINGE_Z = SEAM + 0.30
 
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = args[args.index("--out") + 1] if "--out" in args else "assets/models/airpods-pro2.blend"
+if "--pod-pose" in args:      # experiments: x,y,rise,tilt,yaw of the in-case pods
+    POD_X, POD_Y, POD_RISE, POD_TILT, POD_YAW = [float(v) for v in args[args.index("--pod-pose") + 1].split(",")]
 
 
 # ---- helpers ---------------------------------------------------------------------------------
@@ -483,78 +486,65 @@ def build_hardware(mats, lid):
 
 
 # ---- pods ------------------------------------------------------------------------------------
-# silicone tip profile (radius, z along the tip axis): a dome, widest at the head, rounding off to the opening
-# (photo 241), no neck; the last three points are the recess around the mesh
-TIP_PROF = [(0.0, 0.0), (0.55, 0.0), (0.6, 0.12), (0.61, 0.3), (0.58, 0.45), (0.52, 0.56), (0.44, 0.62),
-            (0.37, 0.62), (0.33, 0.58), (0.31, 0.5), (0.31, 0.35), (0.0, 0.35)]
-# wide, flat tip with a large rounded opening (reference pod-innerfront); the mesh sits at the bottom of the opening
-TIP_TILT = 105.0  # degrees from the stem axis (up) towards the tip direction: ~20 below horizontal (photo 241)
+# Everything below comes from the reference pod silhouettes (tools/render/pod_shape.py, profiles_pod.json): head+stem
+# sections and the silicone tip are fitted in the reference pose (pod roots unrotated, see REF_ROOT) to
+# pod-front/back/outer (IoU 0.96-0.99); the details are placed from the reference PNGs.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pod_shape  # noqa: E402
+
+PODS = pod_shape.load()
+REF_ROOT = PODS["root"]                # root of the left pod in the reference (cm, case frame)
+_pm = PODS["tip"]["pm"]
+# silicone tip profile (radius, z along the tip axis): bulb widest at the head, large opening; the last
+# three points are the recess around the mesh
+TIP_PROF = [(r * PODS["tip"]["sr"] * (_pm[i - 1] if 1 <= i <= 6 else 1.0), z * PODS["tip"]["sl"])
+            for i, (r, z) in enumerate(PODS["tip_prof"])]
 
 
 def build_pod(name, mats):
     root = bpy.data.objects.new(name, None)
     bpy.context.scene.collection.objects.link(root)
-    sgn = 1 if name.endswith("_L") else -1    # tip direction (+x for the left pod, towards the case center)
+    sgn = 1 if name.endswith("_L") else -1    # x towards the case centre for the left pod; mirrored for the right
 
-    # head + stem: one lofted surface from the traced side silhouette of photo 241 (tools/render/trace.py):
-    # rings of half-width hw(z), centred at cx(z), elliptical (depth = POD_DEPTH x width)
-    rows = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals()
-                                       else "tools/render", "profiles.json")))["pod"]
-    # the traced inner edge steps from the head to the stem in one row: smooth it there into a fillet
-    lo = [cx - hw for _z, cx, hw in rows]
-    hi = [cx + hw for _z, cx, hw in rows]
-    band = [i for i, (z, _c, _h) in enumerate(rows) if -1.25 < z < -0.6]
-    for _ in range(80):
-        hi = hi[:band[0]] + [(hi[i - 1] + 2 * hi[i] + hi[i + 1]) / 4 for i in band] + hi[band[-1] + 1:]
-    rows = [(z, (a + b) / 2, (b - a) / 2) for (z, _c, _h), a, b in zip(rows, lo, hi)]
+    # head + stem: one lofted surface of elliptical sections (profiles_pod.json: [z, cx, cy, hx, hy]), no seams
+    rows = pod_shape.smooth_rows(PODS["rows"], 14)
+    rings, top, bot = pod_shape.body_rings(rows, sgn, 64)
     bm = bmesh.new()
-    nlon = 64
-    rings = []
-    for z, cxp, hwp in rows:
-        ring = []
-        for k in range(nlon):
-            t = 2 * math.pi * k / nlon
-            fl = min(max((-0.9 - z) / 0.5, 0.0), 1.0)          # the stem front (-y) is slightly flat (pod-outer/pod-front)
-            dy = POD_DEPTH * (1 - 0.22 * fl) if math.sin(t) < 0 else POD_DEPTH
-            ring.append(bm.verts.new((sgn * cxp + hwp * math.cos(t), dy * hwp * math.sin(t), z)))
-        rings.append(ring)
-    for r0, r1 in zip(rings, rings[1:]):
+    vr = [[bm.verts.new(p_) for p_ in ring] for ring in rings]
+    nlon = len(vr[0])
+    for r0, r1 in zip(vr, vr[1:]):
         for k in range(nlon):
             bm.faces.new((r0[k], r0[(k + 1) % nlon], r1[(k + 1) % nlon], r1[k]))
-    for ring, up in ((rings[0], True), (rings[-1], False)):
-        zz = rows[0][0] + 0.012 if up else rows[-1][0] - 0.04   # a higher top pole makes a spike
-        xx = sgn * (rows[0][1] if up else rows[-1][1])
-        pole = bm.verts.new((xx, 0, zz))
+    for ring, pt, up in ((vr[0], top, True), (vr[-1], bot, False)):
+        pole = bm.verts.new(pt)
         for k in range(nlon):
-            f = (ring[(k + 1) % nlon], ring[k], pole) if up else (ring[k], ring[(k + 1) % nlon], pole)
-            bm.faces.new(f)
+            bm.faces.new((ring[(k + 1) % nlon], ring[k], pole) if up else (ring[k], ring[(k + 1) % nlon], pole))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     head = link(name + "_Body", bm)
-    smooth(head, 80)
     for p_ in head.data.polygons:
         p_.use_smooth = True
-    # dark mic opening on the very bottom tip of the stem (photos 239-241)
-    for p_ in head.data.polygons:
-        p_.use_smooth = True
-    head.data.materials.clear()  # the boolean leaves an empty slot 0 (default grey material): drop it
+    head.data.materials.clear()
     head.data.materials.append(mats["white"])
     head.parent = root
-    sx0 = sgn * rows[-8][1]
     zbot = rows[-1][0]
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(sx0, 0, zbot + 0.01))
+    sx0 = sgn * rows[-1][1]
+    # dark mic opening on the very bottom of the stem
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12,
+                                         location=(sx0, rows[-1][2], zbot + 0.02))
     o = bpy.context.active_object
     o.name = name + "_Mic"
-    o.scale = (0.2, 0.15, 0.045)
+    o.scale = (rows[-1][3] * 0.8, rows[-1][4] * 0.8, 0.05)
     o.data.materials.append(mats["dark"])
     bpy.ops.object.shade_smooth()
     o.parent = root
 
-    # silicone tip: built along +z, the TipRig empty tilts it about y (render.py sets the angle per shot)
+    # silicone tip: built along +z, the TipRig empty aims it (position and direction fitted to the reference)
     rig = bpy.data.objects.new(name + "_TipRig", None)
     bpy.context.scene.collection.objects.link(rig)
     rig.parent = root
-    rig.location = (sgn * 0.62, 0, -0.3)
-    rig.rotation_euler = (0, sgn * math.radians(TIP_TILT), 0)
+    pos, dvec = pod_shape.tip_matrix_args(PODS["tip"], sgn)
+    rig.location = pos
+    rig.rotation_euler = Vector((0, 0, 1)).rotation_difference(Vector(dvec)).to_euler()
     tip = lathe(name + "_Tip", TIP_PROF, steps=56)
     tip.data.materials.append(mats["grey_tip"])
     tip.parent = rig
@@ -562,14 +552,18 @@ def build_pod(name, mats):
     mesh.data.materials.append(mats["mesh"])
     mesh.parent = rig
 
-    # black pill slot on the head front (photos 239-243) facing front-up
     from mathutils import Matrix
 
-    def pill(nm, nvec, along, scl, mat="dark"):
-        n = Vector(nvec).normalized()
-        org = n * 3.0
-        ok, hit, _nn, _i = head.ray_cast(org, -n)
-        pos = hit - n * scl[2] * 0.5 if ok else n * 0.85   # flat and half sunk: flush, ~87 % of its size shows
+    def hit_along(org, dirv):
+        ok, h, nn, _i = head.ray_cast(Vector(org), Vector(dirv).normalized())
+        return (h, nn.normalized()) if ok else (None, None)
+
+    def pill(nm, org, dirv, along, scl, mat="dark"):
+        """Flat ellipsoid sitting on the body where the ray from `org` along `dirv` hits it; long axis `along`."""
+        h, n = hit_along(org, dirv)
+        if h is None:
+            return
+        pos = h - n * scl[2] * 0.5          # half sunk: flush
         lng = Vector(along)
         lng = (lng - n * lng.dot(n)).normalized()
         side_v = lng.cross(n).normalized()
@@ -582,13 +576,12 @@ def build_pod(name, mats):
         o.data.materials.append(mats[mat])
         bpy.ops.object.shade_smooth()
         o.parent = root
-    pill("_Slot", (sgn * 0.4, -0.8, 0.15), (sgn * 1.0, 0, -0.45), (0.12, 0.22, 0.025))  # photo 241
-    # long vertical mesh slot on the back of the head, over the stem (reference pod-back), 0.36 x 0.9 cm: a squircle
-    # patch projected onto the body along -rn and lifted 0.006 (so it follows the curved head/stem junction exactly)
-    rn = Vector((-sgn * 0.3, 1.0, 0.0)).normalized()
-    side = rn.cross(Vector((0, 0, 1))).normalized()
+    # oval grille on the front of the head, 0.5 x 0.24 (pod-front, pod-innerfront), long axis tilted ~33 deg
+    pill("_Slot", (sgn * 0.02, -3.0, 0.49), (0, 1, 0), (sgn * 1.0, 0, -0.65), (0.12, 0.25, 0.025))
+    # long vertical mesh slot on the back of the head, over the stem (pod-back), 0.34 x 0.8: a squircle patch
+    # projected onto the body along -y and lifted 0.006 (so it follows the curved head/stem junction exactly)
     bmp = bmesh.new()
-    nr, ns, hx, hz, zc = 8, 40, 0.18, 0.42, -0.2
+    nr, ns, hx, hz, xc, zc = 8, 40, 0.17, 0.4, sgn * -0.06, -0.02
     cen = bmp.verts.new((0, 0, 0))
     grid = []
     for i in range(1, nr + 1):
@@ -598,10 +591,8 @@ def build_pod(name, mats):
             c_, s_ = math.cos(t), math.sin(t)
             u = math.copysign(abs(c_) ** 0.5, c_) * hx * i / nr      # exponent 0.5 on the unit circle -> squircle-ish pill
             w = math.copysign(abs(s_) ** 0.5, s_) * hz * i / nr
-            org = rn * 3.0 + side * u + Vector((0, 0, zc + w))
-            okk, loc, nrm, _ix = head.ray_cast(org, -rn)
-            v = bmp.verts.new(loc + nrm * 0.006 if okk else (0, 0, 0))
-            ring.append(v)
+            okk, loc, nrm, _ix = head.ray_cast(Vector((xc + u, 3.0, zc + w)), Vector((0, -1, 0)))
+            ring.append(bmp.verts.new(loc + nrm * 0.006 if okk else (0, 0, 0)))
         grid.append(ring)
     for k in range(ns):
         bmp.faces.new((cen, grid[0][k], grid[0][(k + 1) % ns]))
@@ -617,9 +608,9 @@ def build_pod(name, mats):
     slot2.parent = root
 
     # force-sensor flat on the stem front (-y)
-    ok, hit, _n, _i = head.ray_cast(Vector((sx0, -3.0, -1.4)), Vector((0, 1, 0)))
+    ok, hit, _n, _i = head.ray_cast(Vector((sx0, -3.0, -1.2)), Vector((0, 1, 0)))
     bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12,
-                                         location=(hit + Vector((0, 0.02, 0))) if ok else (sx0, -0.3, -1.4))
+                                         location=(hit + Vector((0, 0.02, 0))) if ok else (sx0, -0.3, -1.2))
     o = bpy.context.active_object
     o.name = name + "_Sensor"
     o.scale = (0.05, 0.03, 0.4)
@@ -666,8 +657,8 @@ def main():
     mats = make_materials()
     for sx, nm in ((-1, "Pod_L"), (1, "Pod_R")):
         pod = build_pod(nm, mats)
-        pod.location = (sx * POD_X, POD_Y, SEAM + POD_RISE)
-        pod.rotation_euler = (-math.radians(POD_TILT), 0, 0)
+        pod.location = (sx * (POD_X + STEM_OFF), POD_Y, SEAM + POD_RISE)   # the root is the stem axis
+        pod.rotation_euler = (-math.radians(POD_TILT), 0, -sx * math.radians(POD_YAW))
     base, lid = build_case(mats, pod_clearance())
     hinge, led, loop = build_hardware(mats, lid)
     bpy.ops.wm.save_as_mainfile(filepath=OUT)
