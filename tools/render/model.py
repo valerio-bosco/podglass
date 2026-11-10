@@ -23,7 +23,7 @@ N_FRONT, N_PLAN = 5.0, 3.4          # superellipse exponents: front view (x/z) a
 DOME = 0.07                         # the flat top and bottom faces bulge by this much
 WALL = 0.1                          # lid wall thickness
 POD_X = 1.45                        # pod centers at +-POD_X
-POD_RISE = 0.25                     # head center sits this far ABOVE the seam (heads rise out of the cavities)
+POD_RISE = 0.1                      # head center sits this far ABOVE the seam (heads rise out of the cavities)
 CAVITY_R = 0.95
 HINGE_Y = D / 2 - 0.06              # hinge axis (y, z = SEAM): on the back surface, so the lid does not dig into the base
 
