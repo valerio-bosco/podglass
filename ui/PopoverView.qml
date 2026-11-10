@@ -161,7 +161,10 @@ Glass {
             Label {
                 style: Theme.caption
                 color: Theme.secondary
-                text: view.device.firmware ? Strings.firmware + " " + view.device.firmware : ""
+                // the daemon may send "90.3431000025000000.6807": show the last part only
+                text: view.device.firmware ? Strings.firmware + " " + String(view.device.firmware).split(".").pop() : ""
+                elide: Text.ElideRight
+                Layout.maximumWidth: 140
             }
         }
     }
