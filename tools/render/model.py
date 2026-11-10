@@ -22,7 +22,7 @@ SEAM = H - LID_H
 N_FRONT, N_PLAN = 4.2, 3.2          # superellipse exponents: front view (x/z) and plan (x/y); 2 = ellipse, inf = box
 DOME = 0.07                         # the flat top and bottom faces bulge by this much
 WALL = 0.1                          # lid wall thickness
-POD_SCALE = 0.88                    # pod size vs the model below: head ~1.55 wide vs 6.0 case (photos 242/243)
+POD_SCALE = 0.96                    # pod size vs the model below: head ~1.55 wide vs 6.0 case (photos 242/243)
 POD_X = 1.6                        # pod centers at +-POD_X
 POD_RISE = 0.12                     # head center sits this far above the seam (only the top of the heads shows, photo 243)
 CAVITY_R = 0.95
@@ -233,6 +233,16 @@ def assign(obj, mats, names, picker):
         p.material_index = picker(p)
 
 
+def thumb_scoop():
+    """Small rounded scoop at the front center on the seam (photos 249, 244): about 1/3 of the width,
+    half of it dips into the lid edge and half into the base edge."""
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=48, ring_count=24, location=(0, -D / 2 - 0.08, SEAM))
+    o = bpy.context.active_object
+    o.scale = (1.0, 0.38, 0.4)
+    bpy.ops.object.transform_apply(scale=True)
+    return o
+
+
 # ---- case ------------------------------------------------------------------------------------
 def build_case(mats):
     """Base and lid as two separate objects with a small seam gap."""
@@ -254,8 +264,7 @@ def build_case(mats):
     for hx in (-2.04, -1.79, -1.54, 1.57):
         boolean(base, cyl("hole", 0.07, 1.0, (hx, 0.0, 0.0), verts=12))
     boolean(base, cyl("ledcut", 0.06, 0.1, (0, -D / 2, SEAM - LED_DROP), rot=(math.pi / 2, 0, 0), verts=24))
-    # thumb notch on the front (photo 249/243): stadium about half the width, straddling the seam
-    boolean(base, rbox("thumb", 3.2, 0.55, 0.46, 0.2, segs=6, center=(0, -D / 2 - 0.02, SEAM - 0.2)))
+    boolean(base, thumb_scoop())
     # recessed top face: a thin rim stands around the interior (photos 242/243)
     rec = superell("rec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM - gap + 0.5 - 0.07), dome=0.0, nlat=8, nlon=96)
     boolean(base, rec)
@@ -284,6 +293,7 @@ def build_case(mats):
         c.scale = (1.0, 0.78, 1.0)
         c.location = (sx * POD_X, 0, 0)
         boolean(lid, c)
+    boolean(lid, thumb_scoop())
     lrec = superell("lrec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM + gap - 0.5 + 0.07), dome=0.0, nlat=8, nlon=96)
     boolean(lid, lrec)
     bevel(lid, 0.1, 2, angle=35)
@@ -292,8 +302,6 @@ def build_case(mats):
     # materials
     def base_pick(p):
         c, n = p.center, p.normal
-        if c.y < -0.5 and abs(c.x) < 1.7 and SEAM - 0.5 < c.z < SEAM + 0.1:
-            return 1  # inside of the thumb notch
         if c.z < 0.9 and abs(c.y) < 0.3 and c.z > 0.02 and (abs(c.x) < 0.6 or abs(abs(c.x) - 1.8) < 0.5):
             return 2  # port and speaker holes
         if W / 2 - 0.5 < c.x < W / 2 - 0.08 and abs(c.y) < 0.3 and SEAM - 1.5 < c.z < SEAM - 0.3:
@@ -373,19 +381,40 @@ def build_pod(name, mats):
     # head: egg of revolution around the vertical axis, origin at its center
     hprof = [(0.0, -0.9), (0.4, -0.86), (0.68, -0.62), (0.8, -0.3), (0.84, 0.1), (0.8, 0.5),
              (0.62, 0.86), (0.34, 1.06), (0.0, 1.12)]
-    head = lathe(name + "_Head", hprof, steps=56)
+    head = lathe(name + "_Head", hprof, steps=64)
     head.scale = (1.0, 0.92, 1.0)
-    head.data.materials.append(mats["white"])
-    head.parent = root
-
-    # stem: slightly flat in y, offset outwards so its outer edge runs on into the head silhouette
-    sprof = [(0.0, -2.65), (0.24, -2.64), (0.29, -2.56), (0.3, -2.4), (0.33, -1.7), (0.37, -1.0),
-             (0.4, -0.6), (0.42, -0.3), (0.0, -0.3)]
-    stem = lathe(name + "_Stem", sprof, steps=40)
+    # stem: slightly flat in y, offset outwards so its outer edge runs on into the head silhouette; rounded
+    # white cap at the bottom
+    sprof = [(0.0, -2.65), (0.2, -2.63), (0.29, -2.54), (0.3, -2.4), (0.33, -1.7), (0.37, -1.0),
+             (0.4, -0.6), (0.42, -0.1), (0.0, -0.1)]
+    stem = lathe(name + "_Stem", sprof, steps=48)
     stem.scale = (1.0, 0.95, 1.0)
     stem.location = (-sgn * STEM_OFF, 0, 0)
-    stem.data.materials.append(mats["white"])
-    stem.parent = root
+    for o in (head, stem):
+        activate(o)
+        bpy.ops.object.transform_apply(location=True, scale=True)
+    boolean(head, stem, "UNION")           # one closed surface ...
+    activate(head)
+    head.data.remesh_voxel_size = 0.022      # ... re-meshed evenly, then smoothed so the joint is a fillet
+    bpy.ops.object.voxel_remesh()
+    sm = head.modifiers.new("fillet", "SMOOTH")
+    sm.factor = 0.8
+    sm.iterations = 14
+    apply_mod(head, sm)
+    head.name = name + "_Body"
+    # dark mic opening on the very bottom tip of the stem (photos 239-241)
+    for p_ in head.data.polygons:
+        p_.use_smooth = True
+    head.data.materials.append(mats["white"])
+    head.parent = root
+    sx0 = -sgn * STEM_OFF
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(sx0, 0, -2.635))
+    o = bpy.context.active_object
+    o.name = name + "_Mic"
+    o.scale = (0.2, 0.15, 0.045)
+    o.data.materials.append(mats["dark"])
+    bpy.ops.object.shade_smooth()
+    o.parent = root
 
     # silicone tip: built along +z, the TipRig empty tilts it about y (render.py sets the angle per shot)
     rig = bpy.data.objects.new(name + "_TipRig", None)
@@ -408,8 +437,8 @@ def build_pod(name, mats):
     def pill(nm, nvec, along, scl):
         n = Vector(nvec).normalized()
         org = n * 3.0
-        ok, hit, _nn, _i = head.ray_cast(Vector((org.x, org.y / 0.92, org.z)), -n)
-        pos = Vector((hit.x, hit.y * 0.92, hit.z)) - n * 0.01 if ok else n * 0.85
+        ok, hit, _nn, _i = head.ray_cast(org, -n)
+        pos = hit - n * 0.01 if ok else n * 0.85
         lng = Vector(along)
         lng = (lng - n * lng.dot(n)).normalized()
         side_v = lng.cross(n).normalized()
@@ -425,21 +454,14 @@ def build_pod(name, mats):
     pill("_Slot", (-sgn * 0.25, -0.68, 0.68), (sgn * 0.5, 0, -1.0), (0.1, 0.26, 0.07))
     pill("_Slot2", (-sgn * 0.45, 0.2, 0.87), (sgn * 0.3, 1.0, 0.0), (0.075, 0.2, 0.06))
 
-    # steel contact band at the stem end, microphone dot and force-sensor flat on the stem front (-y)
-    sx0 = -sgn * STEM_OFF
-    band = cyl(name + "_Band", 0.345, 0.1, (sx0, 0, -2.5), verts=32)
-    band.scale = (1.0, 0.85, 1.0)
-    band.data.materials.append(mats["steel"])
-    smooth(band, 40)
-    band.parent = root
-    for nm, z, sc, mat, yy in (("Mic", -2.3, (0.1, 0.035, 0.16), "dark", -0.3), ("Sensor", -1.4, (0.05, 0.03, 0.4), "white_rough", -0.33)):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(sx0, yy, z))
-        o = bpy.context.active_object
-        o.name = f"{name}_{nm}"
-        o.scale = sc
-        o.data.materials.append(mats[mat])
-        bpy.ops.object.shade_smooth()
-        o.parent = root
+    # force-sensor flat on the stem front (-y)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(sx0, -0.33, -1.4))
+    o = bpy.context.active_object
+    o.name = name + "_Sensor"
+    o.scale = (0.05, 0.03, 0.4)
+    o.data.materials.append(mats["white_rough"])
+    bpy.ops.object.shade_smooth()
+    o.parent = root
     root.scale = (POD_SCALE,) * 3
     return root
 
