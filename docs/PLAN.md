@@ -151,7 +151,7 @@ Commands (`podglass set ...`, and the same verbs as `{"cmd": ...}` lines on the 
 | Input | Condition | Actions |
 |---|---|---|
 | advert from my AirPods, lid open (rising edge) | always | `show_card` |
-| advert with lid closed, or no advert for 3 s (adverts stop when the lid closes) | card visible | `hide_card` after 1.5 s |
+| advert with lid closed, or no advert for 8 s (adverts stop when the lid closes; gaps up to 5 s happen with the lid open) | card visible | `hide_card` after 1.5 s |
 | lid open, not connected | `autoconnect == "lid-open"` and AirPods not busy with another device (busy = decrypted host tail is not this PC and byte 0 is `05`, PROTOCOL.md 1.3) | `connect` |
 | advert, any pod in ear, not connected | `autoconnect in ("in-ear","lid-open")`, not busy elsewhere, a local input event in the last 10 min (user is at this PC) | `connect` |
 | advert from unknown AirPods in pairing mode, RSSI > -55 | not shown in the last 5 min | `show_card(setup)` |

@@ -15,7 +15,7 @@ SETUP_REPEAT_S = 300
 USER_ACTIVE_S = 600  # a local input event this recent means the user is at this PC
 RESUME_WINDOW_S = 60  # reinsert a pod within this time to resume what was paused
 CONNECT_RETRY_S = 30  # no automatic connect this long after a failure
-SILENCE_S = 3.0  # adverts stop when the lid closes: this much silence counts as "lid closed"
+SILENCE_S = 8.0  # adverts stop when the lid closes; gaps up to 5.2 s were seen with the lid open
 
 
 # --- inputs ---------------------------------------------------------------------------------

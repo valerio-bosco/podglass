@@ -125,8 +125,8 @@ class IpcServer:
         self.config_line = line
         self._broadcast(line)
 
-    def publish_event(self, name: str) -> None:
-        self._broadcast(json.dumps({"type": "event", "name": name}, separators=(",", ":")))
+    def publish_event(self, name: str, **data) -> None:
+        self._broadcast(json.dumps({"type": "event", "name": name, **data}, separators=(",", ":")))
 
     async def close(self) -> None:
         # close the clients first: since Python 3.12 wait_closed() waits for every connection

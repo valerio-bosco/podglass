@@ -42,6 +42,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="podglass", description=__doc__)
     sub = parser.add_subparsers(dest="cmd")
 
+    dm = sub.add_parser("daemon", help="run the background service")
+    dm.add_argument("--replay", metavar="FILE", help="feed a BLE capture instead of scanning")
+    dm.add_argument("-v", "--verbose", action="store_true")
     sub.add_parser("watch", help="print state and events as JSON lines (used by the UI)")
     st = sub.add_parser("status", help="show battery, mode and connection")
     st.add_argument("--json", action="store_true")
@@ -72,6 +75,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     from . import ipc
 
+    if args.cmd == "daemon":
+        from pathlib import Path
+
+        from .daemon import main as daemon_main
+
+        return daemon_main(Path(args.replay) if args.replay else None, args.verbose)
     if args.cmd == "watch":
         return _client(ipc.watch(out=lambda line: print(line, flush=True)))
     if args.cmd == "status":

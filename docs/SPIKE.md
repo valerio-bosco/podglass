@@ -19,7 +19,7 @@ AAP session in `tests/fixtures/aap/` (gitignored). Steps 9-10 need the iPhone.
   lid open). Fixed in `adv.py`.
 - In-ear bits decode correctly (right pod removed -> right_in_ear False).
 - **Lid closed = adverts stop**: 2 adverts right after closing, then none for 20 s. The daemon must
-  treat "lid closed" as: last advert had lid closed, or no advert for 3 s while the card is shown.
+  treat "lid closed" as: last advert had lid closed, or no advert for 8 s while the card is shown (gaps up to 5.2 s seen with the lid open).
 - Closing the lid with the pods inside disconnects them from the PC (AAP session ended at 11:18:10).
   Opening it again did not reconnect to the PC by itself: podglass has to call Connect().
 - Connection byte: `04` idle (also during the iPhone call step), `05` while music played on the

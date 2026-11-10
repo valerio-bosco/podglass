@@ -4,7 +4,7 @@ from podglass.adv import Advert, Precise
 from podglass.config import Config
 from podglass.policy import (
     Action, AdvertSeen, Bluez, CaVolumeChanged, Command, ConnectFailed, EarChanged, InputActivity,
-    Policy, Tick, emit,
+    SILENCE_S, Policy, Tick, emit,
 )
 
 BASE = Advert(addr="70:81:94:0D:FB:AA", rssi=-50, model="pro2-usbc", paired=True, primary_left=True,
@@ -198,7 +198,7 @@ def test_hide_cancelled_when_lid_reopens_within_delay():
     p.step(LID_OPEN, 0)
     p.step(LID_CLOSED, 10)
     assert names(p.step(LID_OPEN, 11)) == ["emit:lid-opened"]
-    assert p.next_deadline() == 14  # only the advert-silence check is left
+    assert p.next_deadline() == 11 + SILENCE_S  # only the advert-silence check is left
     assert p.step(Tick(), 12) == []
     assert p.card == "normal"
 
@@ -285,18 +285,18 @@ def test_silence_closes_lid_and_hides_card():
     p = policy()
     p.step(LID_OPEN, 0)
     p.step(LID_OPEN, 1)
-    assert p.next_deadline() == 4
-    assert p.step(Tick(), 3.9) == []
-    assert names(p.step(Tick(), 4)) == ["emit:lid-closed", "hide_card"]
+    assert p.next_deadline() == 1 + SILENCE_S
+    assert p.step(Tick(), 6) == []  # a 5 s gap with the lid open is normal
+    assert names(p.step(Tick(), 1 + SILENCE_S)) == ["emit:lid-closed", "hide_card"]
     assert p.next_deadline() is None
-    assert names(p.step(LID_OPEN, 10)) == ["emit:lid-opened", "show_card"]
+    assert names(p.step(LID_OPEN, 20)) == ["emit:lid-opened", "show_card"]
 
 
 def test_unknown_adverts_do_not_keep_card_alive():
     p = policy()
     p.step(LID_OPEN, 0)
     p.step(seen(known=False, lid_open=True), 2)
-    assert names(p.step(Tick(), 3)) == ["emit:lid-closed", "hide_card"]
+    assert names(p.step(Tick(), SILENCE_S)) == ["emit:lid-closed", "hide_card"]
 
 
 def test_no_ducking_by_default():
