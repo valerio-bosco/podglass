@@ -41,8 +41,8 @@ LED_DROP = 0.78                     # status light below the seam (reference fro
 # corner of the closed lid (y = 1.09, z = SEAM + gap) lands on the observed corner
 HINGE_Y = 1.08
 HINGE_Z = SEAM + 0.158
-N_LID_RIM = float(sys.argv[sys.argv.index("--nrim") + 1]) if "--nrim" in sys.argv else 4.0   # plan exponent at the rim, blended to N_PLAN_LID over 0.6 cm
-N_PLAN_LID = float(sys.argv[sys.argv.index("--nlid") + 1]) if "--nlid" in sys.argv else 4.0                    # the lid plan section is boxier than the base's (front-view widths)
+N_LID_RIM = float(sys.argv[sys.argv.index("--nrim") + 1]) if "--nrim" in sys.argv else N_PLAN   # plan exponent at the rim, blended to N_PLAN_LID over 0.6 cm
+N_PLAN_LID = float(sys.argv[sys.argv.index("--nlid") + 1]) if "--nlid" in sys.argv else N_PLAN                    # the lid plan section is boxier than the base's (front-view widths)
 
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = args[args.index("--out") + 1] if "--out" in args else "assets/models/airpods-pro2.blend"
@@ -338,19 +338,11 @@ def assign(obj, mats, names, picker):
 
 
 def thumb_scoop():
-    """Wide shallow scoop in the base just under the seam (photos 249, 244): about half the case width
-    (3.0 cm), 0.4 cm tall, 0.2 cm deep, smooth concave."""
-    depth, b = 0.2, 0.5
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=64, ring_count=32,
-                                         location=(0, -D / 2 - b + depth, SEAM - 0.17))
-    o = bpy.context.active_object
-    k = math.sqrt(1 - ((b - depth) / b) ** 2)      # chord fraction at the case surface
-    o.scale = (1.5 / k, b, 0.23 / k)
-    bpy.ops.object.transform_apply(scale=True)
-    # it would reach the recessed top face (y = -D/2 + 0.2) and open a hole: keep a 0.08 wall to it
-    keep = superell("keepout", W / 2 - 0.12, D / 2 - 0.12, 0.5, center=(0, 0, SEAM + 0.43 - 0.08), dome=0.0, nlat=8, nlon=96)
-    boolean(o, keep)
-    return o
+    """Thumb recess (reference front/threequarter shots, 175 px/cm): a long shallow step cut into the top
+    front edge of the base, open at the seam: 2.6 wide, 0.15 tall, 0.07 deep, flat bottom, rounded corners."""
+    w, h, depth, r = 2.6, 0.15, 0.07, 0.07
+    top = SEAM + 0.2
+    return rbox("thumb", w, 0.3, top - (SEAM - h), r, segs=4, center=(0, -D / 2 + depth - 0.15, (top + SEAM - h) / 2))
 
 
 # ---- case ------------------------------------------------------------------------------------
