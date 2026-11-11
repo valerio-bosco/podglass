@@ -160,55 +160,71 @@ def _profile():
     return _profiles()["sf_front"]
 
 
-def _case_table():
-    """tools/render/profiles_case.json: rows [z, half-width, y front, y back] of the closed case (base + lid),
-    smoothed (pixel steps would show as bands in the reflections)."""
+def _bez(ctrl, t):
+    """Bernstein evaluation of a Bezier curve with len(ctrl) control values."""
+    n = len(ctrl) - 1
+    return sum(math.comb(n, k) * t ** k * (1 - t) ** (n - k) * c for k, c in enumerate(ctrl))
+
+
+def _shell_curves():
+    """tools/render/profiles_case.json "shell_bezier": quintic Beziers z(t), hw(t), yh(t) from the equator (t=0) to the
+    cap rim (t=1). The three share t, and both ends have zero curvature (end controls repeated), so the case is
+    G2 from the equator into the cap: no kink, no curvature jump."""
     here = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else "tools/render"
-    rows = json.load(open(os.path.join(here, "profiles_case.json")))["case_shell"]
-    cols = [[r[i] for r in rows] for i in range(4)]
-    for k in (1, 2, 3):
-        c = cols[k]
-        for _ in range(3):
-            c = [c[0]] + [(c[i - 1] + 2 * c[i] + c[i + 1]) / 4 for i in range(1, len(c) - 1)] + [c[-1]]
-        cols[k] = c
-    return cols
+    c = json.load(open(os.path.join(here, "profiles_case.json")))["shell_bezier"]
+    return c["z"], c["hw"], c["yh"]
 
 
-def traced_shell(name, dome=DOME, nlat=120, nlon=160):
-    """Case body from the traced reference silhouettes (profiles_case.json). At height z the plan section is a
-    superellipse with half-width hw(z) (front view), spanning y in [yf(z), yb(z)] (end view; the lid is lopsided:
-    round at the front, slanted at the back), exponent N_PLAN (base) or N_PLAN_LID (lid)."""
-    zs, hws, yfs, ybs = _case_table()
-
-    def at(col, z):
-        z = min(max(z, 0.0), H)
-        for i in range(len(zs) - 1):
-            if z <= zs[i + 1]:
-                t = (z - zs[i]) / (zs[i + 1] - zs[i])
-                return col[i] + t * (col[i + 1] - col[i])
-        return col[-1]
+def traced_shell(name, dome=DOME, nlat=48, nlon=192):
+    """Case body (closed, base + lid, mirror symmetric about z = H/2). The plan section at parameter t is a
+    superellipse (exponent N_PLAN) with half sizes hw(t), yh(t), at height z(t): all three are quintic Beziers fitted
+    to the traced reference silhouettes. Rings are spaced by arc length; the flat top and bottom are closed by
+    concentric scaled rings (a fourth-order dome, so the curvature stays continuous) and a centre vertex."""
+    cz, ch, cy = _shell_curves()
+    dense = [i / 2000 for i in range(2001)]
+    pts = [(_bez(cz, t), _bez(ch, t), _bez(cy, t)) for t in dense]
+    acc = [0.0]
+    for p, q in zip(pts, pts[1:]):
+        acc.append(acc[-1] + math.hypot(q[1] - p[1], q[0] - p[0]) + math.hypot(q[2] - p[2], q[0] - p[0]))
+    ts = []
+    j = 0
+    for i in range(nlat + 1):
+        target = acc[-1] * i / nlat
+        while j < 2000 and acc[j + 1] < target:
+            j += 1
+        j = min(j, 1999)
+        f = (target - acc[j]) / max(acc[j + 1] - acc[j], 1e-12)
+        ts.append(dense[j] + f / 2000)
+    half = [(_bez(cz, t), _bez(ch, t), _bez(cy, t)) for t in ts]          # equator -> rim, z falling
+    e = 2.0 / N_PLAN
     bm = bmesh.new()
-    rings = []
-    zl = [H / 2 * (1 - math.cos(math.pi * i / nlat)) for i in range(nlat + 1)]
-    zl = sorted(set(zl + [SEAM - 0.01, SEAM + 0.01, SEAM + 0.03]))
-    for z in zl:
-        a_ = at(hws, z)
-        yc, b_ = (at(yfs, z) + at(ybs, z)) / 2, max((at(ybs, z) - at(yfs, z)) / 2, 0.02)
-        n_ = N_PLAN if z < SEAM + 0.02 else N_LID_RIM + (N_PLAN_LID - N_LID_RIM) * min((z - SEAM - 0.02) / 0.6, 1.0)
-        e = 2.0 / n_
-        ring = []
+
+    def ring(z, a_, b_):
+        out = []
         for k in range(nlon):
-            t = 2 * math.pi * k / nlon
-            ring.append(bm.verts.new((a_ * math.copysign(abs(math.cos(t)) ** e, math.cos(t)),
-                                      yc + b_ * math.copysign(abs(math.sin(t)) ** e, math.sin(t)), z)))
-        rings.append(ring)
+            th = 2 * math.pi * k / nlon
+            out.append(bm.verts.new((a_ * math.copysign(abs(math.cos(th)) ** e, math.cos(th)),
+                                     b_ * math.copysign(abs(math.sin(th)) ** e, math.sin(th)), z)))
+        return out
+    ncap = 12
+    a_r, b_r = half[-1][1], half[-1][2]
+    bottom = []
+    for i in range(ncap):                                              # cap rings, centre outwards
+        s = (i + 1) / (ncap + 1)
+        s = math.sin(s * math.pi / 2)                                   # denser near the rim
+        bottom.append((-dome * (1 - s * s) ** 2, a_r * s, b_r * s))
+    seq = bottom + list(half[::-1])          # rim ... equator (z rising from 0)
+    rings = [ring(z, a, b) for z, a, b in seq]
+    # lid half: mirror of the above without the equator
+    up = [(H - z, a, b) for z, a, b in seq[::-1][1:]]
+    rings += [ring(z, a, b) for z, a, b in up]
     for r0, r1 in zip(rings, rings[1:]):
         for k in range(nlon):
             bm.faces.new((r0[k], r0[(k + 1) % nlon], r1[(k + 1) % nlon], r1[k]))
-    for ring, up in ((rings[0], False), (rings[-1], True)):
-        pole = bm.verts.new((0, (at(yfs, H) + at(ybs, H)) / 2 if up else 0, H if up else -dome))
+    for rg, top in ((rings[0], False), (rings[-1], True)):
+        pole = bm.verts.new((0, 0, H + dome if top else -dome))
         for k in range(nlon):
-            f = (ring[k], ring[(k + 1) % nlon], pole) if up else (ring[(k + 1) % nlon], ring[k], pole)
+            f = (rg[k], rg[(k + 1) % nlon], pole) if top else (rg[(k + 1) % nlon], rg[k], pole)
             bm.faces.new(f)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     ob = link(name, bm)
