@@ -252,6 +252,16 @@ def tip_cutter_profile(ctrl, gap, n=200):
     return np.vstack([p, cap])
 
 
+def mesh_dome(r, z_edge, depth, thick=0.045, n=14, nlon=96):
+    """Speaker mesh disc (verts, faces) along +z: radius r, rim top at z_edge, centre dipped by `depth` (slight concave dome, a
+    smooth parabola), flat underside `thick` below the rim (it sinks into the bore floor)."""
+    import numpy as np
+    u = np.linspace(0, 1, n)
+    top = [(r * x, z_edge - depth * (1 - x * x)) for x in u]
+    q = top + [(r, z_edge - thick), (0.0, z_edge - thick)]
+    return revolve(q, nlon)
+
+
 def revolve(q, nlon=160):
     """Revolve the meridian q (rows of radius, z; first and last on the axis) about z."""
     import numpy as np
