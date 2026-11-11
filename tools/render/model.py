@@ -678,19 +678,13 @@ def build_pod(name, mats):
     bpy.context.scene.collection.objects.link(root)
     sgn = 1 if name.endswith("_L") else -1    # x towards the case centre for the left pod; mirrored for the right
 
-    # head + stem: one lofted surface of elliptical sections (profiles_pod.json: [z, cx, cy, hx, hy]), no seams
-    rows = pod_shape.smooth_rows(PODS["rows"], 10)
-    rings, top, bot = pod_shape.body_rings(rows, sgn, 64)
+    # head + stem: one smooth implicit surface (pod_shape.sdf: egg head smooth-unioned with the rounded stem), meshed in rings
+    B = PODS["body"]
+    verts, quads, tris = pod_shape.body_mesh(B, sgn, 200, 128)
     bm = bmesh.new()
-    vr = [[bm.verts.new(p_) for p_ in ring] for ring in rings]
-    nlon = len(vr[0])
-    for r0, r1 in zip(vr, vr[1:]):
-        for k in range(nlon):
-            bm.faces.new((r0[k], r0[(k + 1) % nlon], r1[(k + 1) % nlon], r1[k]))
-    for ring, pt, up in ((vr[0], top, True), (vr[-1], bot, False)):
-        pole = bm.verts.new(pt)
-        for k in range(nlon):
-            bm.faces.new((ring[(k + 1) % nlon], ring[k], pole) if up else (ring[k], ring[(k + 1) % nlon], pole))
+    vv = [bm.verts.new(tuple(p_)) for p_ in verts]
+    for f_ in quads + tris:
+        bm.faces.new([vv[i] for i in f_])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     head = link(name + "_Body", bm)
     for p_ in head.data.polygons:
@@ -698,17 +692,17 @@ def build_pod(name, mats):
     head.data.materials.clear()
     head.data.materials.append(mats["white"])
     head.parent = root
-    # dark mic opening on the flat bottom of the stem: on the last wide section
-    j = max(i for i, r_ in enumerate(rows) if r_[3] > 0.15 and r_[4] > 0.15)
-    zj, cxj, cyj, hxj, hyj = rows[j][:5]
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(sgn * cxj, cyj, zj - 0.02))
+    # dark mic opening on the flat bottom of the stem
+    zb = B["sz"][1]
+    axx = lambda z_: (B["sa"][0] + B["ss"][0] * (z_ - B["sa"][2]), B["sa"][1] + B["ss"][1] * (z_ - B["sa"][2]))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(sgn * axx(zb)[0], axx(zb)[1], zb + 0.01))
     o = bpy.context.active_object
     o.name = name + "_Mic"
-    o.scale = (hxj * 0.6, hyj * 0.6, 0.04)
+    o.scale = (B["sr"][0] * 0.45, B["sr"][1] * 0.45, 0.03)
     o.data.materials.append(mats["dark"])
     bpy.ops.object.shade_smooth()
     o.parent = root
-    sx0 = sgn * rows[j][1]
+    sx0 = sgn * axx(-1.2)[0]
 
     # silicone tip: built along +z, the TipRig empty aims it (position and direction fitted to the reference)
     rig = bpy.data.objects.new(name + "_TipRig", None)
