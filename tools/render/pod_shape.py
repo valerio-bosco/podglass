@@ -189,3 +189,108 @@ def tip_matrix_args(tip, sgn=1):
     dx, dy, dz = tip["dir"]
     n = math.sqrt(dx * dx + dy * dy + dz * dz)
     return (sgn * x, y, z), (sgn * dx / n, dy / n, dz / n)
+
+
+# ---- smooth silicone tip: clamped cubic B-spline profile (C2) revolved about the tip axis ------------------------------------
+# "tip_ctrl" are the control points (radius, z) of the closed meridian: it starts on the axis inside the head, runs up the bulb,
+# round the lip and down the bore wall, and ends on the axis at the bore floor (both ends horizontal).  A handful of control
+# points replaces the traced polyline "tip_prof" (fit target only), so the surface has no waviness by construction.
+def bspline_basis(t, nc, xp=None):
+    import numpy as np
+    nk = nc - 4
+    kn = np.r_[[0.0] * 4, np.linspace(0, 1, nk + 2)[1:-1], [1.0] * 4]
+    t = np.clip(np.asarray(t, float), 0, 1 - 1e-12)
+    B = np.zeros((len(t), nc))
+    for j in range(nc):                      # Cox-de Boor, degree 3
+        N = [((kn[i] <= t) & (t < kn[i + 1])).astype(float) for i in range(len(kn) - 1)]
+        for dgr in range(1, 4):
+            M = []
+            for i in range(len(kn) - 1 - dgr):
+                a = (t - kn[i]) / (kn[i + dgr] - kn[i]) * N[i] if kn[i + dgr] > kn[i] else 0 * t
+                b = (kn[i + dgr + 1] - t) / (kn[i + dgr + 1] - kn[i + 1]) * N[i + 1] if kn[i + dgr + 1] > kn[i + 1] else 0 * t
+                M.append(a + b)
+            N = M
+        B = np.stack(N, 1)
+        break
+    return B
+
+
+def tip_curve(ctrl, n=240):
+    """(n, 2) points (radius, z) of the tip meridian, evenly spaced in arc length."""
+    import numpy as np
+    c = np.asarray(ctrl, float)
+    tt = np.linspace(0, 1, 4000)
+    q = bspline_basis(tt, len(c)) @ c
+    q[-1] = c[-1]
+    d = np.r_[0, np.cumsum(np.hypot(*np.diff(q, axis=0).T))]
+    s = np.linspace(0, d[-1], n)
+    return np.stack([np.interp(s, d, q[:, 0]), np.interp(s, d, q[:, 1])], 1)
+
+
+def tip_mesh(ctrl, nlon=160, nprof=240):
+    """Revolve the meridian about z.  Returns (verts, faces); the two poles are single vertices (triangle fans)."""
+    return revolve(tip_curve(ctrl, nprof), nlon)
+
+
+def tip_cutter_profile(ctrl, gap, n=200):
+    """Closed meridian of the tip solid grown by `gap` along its normals, with the bore filled (a convex-ish plug to cut
+    clearance with): the outer curve up to the lip crest, then straight across to the axis."""
+    import numpy as np
+    q = tip_curve(ctrl, 1200)
+    i = int(np.argmax(q[:, 1]))
+    q = q[:i + 1]
+    t = np.gradient(q, axis=0)
+    t /= np.linalg.norm(t, axis=1, keepdims=True) + 1e-12
+    nrm = np.stack([t[:, 1], -t[:, 0]], 1)           # right of the travel direction: away from the solid
+    p = q + gap * nrm
+    p[0, 0] = 0.0
+    top = q[-1, 1] + gap
+    p = p[p[:, 1] <= top]
+    sel = np.linspace(0, len(p) - 1, n).astype(int)
+    p = p[sel]
+    cap = [(r, top) for r in np.linspace(p[-1, 0], 0.0, 12)[1:]]
+    return np.vstack([p, cap])
+
+
+def revolve(q, nlon=160):
+    """Revolve the meridian q (rows of radius, z; first and last on the axis) about z."""
+    import numpy as np
+    nprof = len(q)
+    q = np.array(q, float)
+    q[0, 0] = 0.0
+    q[-1, 0] = 0.0
+    th = 2 * np.pi * np.arange(nlon) / nlon
+    V = [np.array([0.0, 0.0, q[0, 1]])]
+    for r, z in q[1:-1]:
+        V += [np.array([r * np.cos(a), r * np.sin(a), z]) for a in th]
+    V.append(np.array([0.0, 0.0, q[-1, 1]]))
+    V = np.array(V)
+    F = []
+    rows = nprof - 2
+    idx = lambda i, k: 1 + i * nlon + k % nlon
+    for k in range(nlon):
+        F.append((0, idx(0, k + 1), idx(0, k)))
+        F.append((len(V) - 1, idx(rows - 1, k), idx(rows - 1, k + 1)))
+    for i in range(rows - 1):
+        for k in range(nlon):
+            F.append((idx(i, k), idx(i, k + 1), idx(i + 1, k + 1), idx(i + 1, k)))
+    return V, F
+
+
+def fit_tip_ctrl(prof, nc=11):
+    """Least-squares control points for the traced polyline `prof` (ends fixed on the axis, horizontal tangents there)."""
+    import numpy as np
+    pts = np.array(catmull([tuple(p) for p in prof]))
+    d = np.r_[0, np.cumsum(np.hypot(*np.diff(pts, axis=0).T))]
+    B = bspline_basis(d / d[-1], nc)
+    B[-1] = np.eye(nc)[-1]
+    z0, zn = pts[0, 1], pts[-1, 1]
+    c = np.zeros((nc, 2))
+    c[0], c[-1] = (0, z0), (0, zn)
+    free = [i for i in range(1, nc - 1)]
+    rhs = pts - np.outer(B[:, 0], c[0]) - np.outer(B[:, -1], c[-1])
+    A = B[:, free]
+    sol = np.linalg.lstsq(A, rhs, rcond=None)[0]
+    c[free] = sol
+    c[1, 1], c[-2, 1] = z0, zn
+    return c

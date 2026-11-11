@@ -35,6 +35,7 @@ POD_YAW = 30.0                      # the tips turn towards the case centre (rot
 POD_Y = -0.15                       # centres the 1.55 deep tilted pod between the walls
 POD_DEPTH = 0.93                    # pod depth / width (photos 239/240 vs 242)
 CAVITY_R = 0.95
+PK_N = 3.6                         # pocket outline superellipse exponent (higher: straighter sides, a parallel bridge)
 PK_X, PK_Y, PK_A, PK_B = 1.41, 0.0, 1.21, 0.93   # interior pocket: centre x/y, half axes (reference int-front: x 0.17..2.6)
 STEM_OFF = 0.12                     # the stem axis sits this far outwards of the head axis (reference pods)
 LED_DROP = 0.78                     # status light below the seam (reference front shot: 0.08 wide)
@@ -351,7 +352,7 @@ def make_materials():
     return {
         "white": material("White gloss", (0.95, 0.94, 0.91), rough=0.13, coat=1.0, coat_rough=0.015, spec=0.6),
         "white_rough": material("White inside", (0.92, 0.91, 0.88), rough=0.35, coat=0.0),
-        "grey_tip": material("Silicone tip", (0.82, 0.77, 0.6), rough=0.4, sss=(0.35, (0.8, 0.82, 0.85))),
+        "grey_tip": material("Silicone tip", (0.82, 0.77, 0.6), rough=0.55, sss=(0.35, (0.8, 0.82, 0.85))),
         "mesh": material("Mesh", (0.03, 0.03, 0.034), rough=0.6, bump=(420.0, 0.9)),
         "gold": material("Gold", (0.85, 0.62, 0.25), rough=0.3, metal=1.0),
         "steel": material("Steel", (0.82, 0.82, 0.83), rough=0.28, metal=1.0),
@@ -377,12 +378,18 @@ def thumb_scoop():
     return rbox("thumb", w, 0.3, top - (SEAM - h), r, segs=4, center=(0, -D / 2 + depth - 0.15, (top + SEAM - h) / 2))
 
 
-def bathtub(name, cx, cy, a, b, z_top, z_bot, rb, n=2.8, up=False, nr=14, ns=96, rh=None):
+def bathtub(name, cx, cy, a, b, z_top, z_bot, rb, n=2.8, up=False, nr=14, ns=96, rh=None, zf=None, rf=0.12, nf=8):
     """Pocket cutter: a superellipse prism (half axes a, b, exponent n) with a rounded bottom corner of radius rb
     (the reference pockets are rounded rectangles hugging the pods). up=True mirrors it (lid bowls: bottom = top)."""
     bm = bmesh.new()
     # (inset, z) from the wall down round the corner: inset 0 -> rb
-    prof = [(0.0, z_top + 0.3), (0.0, z_bot + rb)] + [((rb if rh is None else rh) * (1 - math.cos(t)), z_bot + rb - rb * math.sin(t))
+    # zf: height of the surface the pocket is cut into; the rim is flared into it with a fillet of radius rf (a smooth edge)
+    if zf is None:
+        top = [(0.0, z_top + 0.3)]
+    else:
+        top = [(-rf, z_top + 0.3), (-rf, zf)] + [(-rf * (1 - math.cos(t)), zf - rf + rf * math.sin(t))
+                                                  for t in [math.pi / 2 - i / nf * math.pi / 2 for i in range(1, nf + 1)]]
+    prof = top + [(0.0, z_bot + rb)] + [((rb if rh is None else rh) * (1 - math.cos(t)), z_bot + rb - rb * math.sin(t))
                                                       for t in [i / nr * math.pi / 2 for i in range(1, nr + 1)]]
     rings = []
     for inset, z in prof:
@@ -574,7 +581,7 @@ def build_case(mats, clear=()):
     rec = superell("rec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM - gap + 0.5 - 0.07), dome=0.0, nlat=8, nlon=96)
     boolean(base, rec)
     for sx in (-1, 1):  # two pockets hugging the pods (reference: rounded rectangles, a bridge between them)
-        boolean(base, bathtub("pocket_b", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.6, 1.3, rh=0.8))
+        boolean(base, bathtub("pocket_b", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.6, 1.3, n=PK_N, rh=0.8, zf=SEAM - 0.09))
     for c in clear:
         boolean(base, c, keep=True)
     clean(base)
@@ -585,7 +592,7 @@ def build_case(mats, clear=()):
     lid = shell("Case_Lid")
     boolean(lid, rbox("keep", W * 2, D * 2, LID_H * 2, 0.0, segs=1, center=(0, 0, H - LID_H + gap + LID_H)), "INTERSECT")
     for sx in (-1, 1):
-        c = bathtub("bowl", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.05, 1.35, up=True, rh=0.8)
+        c = bathtub("bowl", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.05, 1.35, n=PK_N, up=True, rh=0.8, zf=SEAM - 0.09)
         # the traced top falls towards the ends: keep the bowl one wall inside the shell or it cuts through
         boolean(c, inner_shell("inner"), "INTERSECT")
         boolean(lid, c)
@@ -671,6 +678,7 @@ REF_ROOT = PODS["root"]                # root of the left pod in the reference (
 # silicone tip profile (radius, z along the tip axis), traced from the reference (tools/render/profiles_pod.json): bulb widest
 # near the head, the last three points are the opening and the recess around the mesh
 TIP_PROF = [tuple(p) for p in PODS["tip_prof"]]
+TIP_CTRL = PODS["tip_ctrl"]            # smooth B-spline meridian of the tip (pod_shape.tip_mesh), fitted to TIP_PROF
 
 
 def build_pod(name, mats):
@@ -713,7 +721,15 @@ def build_pod(name, mats):
     rig.rotation_euler = Vector((0, 0, 1)).rotation_difference(Vector(dvec)).to_euler()
     # the tip is slightly oval: scaled by ecc along an axis rolled by -roll about its own axis (mirrored for the right pod)
     oval = (0, 0, -sgn * PODS["tip"].get("roll", 0.0)), (1, PODS["tip"].get("ecc", 1.0), 1)
-    tip = lathe(name + "_Tip", TIP_PROF, steps=56)
+    tv, tf = pod_shape.tip_mesh(TIP_CTRL)
+    bmt = bmesh.new()
+    tvv = [bmt.verts.new(tuple(p_)) for p_ in tv]
+    for f_ in tf:
+        bmt.faces.new([tvv[i] for i in f_])
+    bmesh.ops.recalc_face_normals(bmt, faces=bmt.faces)
+    tip = link(name + "_Tip", bmt)
+    for p_ in tip.data.polygons:
+        p_.use_smooth = True
     tip.data.materials.append(mats["grey_tip"])
     tip.parent = rig
     tip.rotation_euler, tip.scale = oval
@@ -825,9 +841,16 @@ def pod_clearance(gap=0.03):
     for o in list(bpy.data.objects):
         if o.type == "MESH" and o.name.startswith("Pod_") and o.name.endswith(("_Body", "_Tip", "_Mic")):
             if o.name.endswith("_Tip"):
-                # from the profile: displacing the real tip folds its recess rim inwards and the cut fails
-                prof = [(0.0, -gap)] + [(r + gap, z + (gap if z > 0.3 else 0.0)) for r, z in TIP_PROF[1:9]] + [(0.0, max(z for _r, z in TIP_PROF[:9]) + gap)]
-                c = lathe(o.name + "_Clear", prof, steps=56)
+                # analytic: the tip meridian offset by `gap` with the bore plugged (displacing the real tip folds the rim)
+                tv, tf = pod_shape.revolve(pod_shape.tip_cutter_profile(TIP_CTRL, 0.4 * gap), 96)
+                bmc = bmesh.new()
+                tvv = [bmc.verts.new(tuple(p_)) for p_ in tv]
+                for f_ in tf:
+                    bmc.faces.new([tvv[i] for i in f_])
+                bmesh.ops.recalc_face_normals(bmc, faces=bmc.faces)
+                c = link(o.name + "_Clear", bmc)
+                for p_ in c.data.polygons:
+                    p_.use_smooth = True
                 c.data.transform(o.matrix_world)
                 out.append(c)
                 continue
