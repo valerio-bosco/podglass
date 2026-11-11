@@ -51,6 +51,13 @@ sc.display.shading.light = "FLAT"
 sc.display.shading.color_type = "SINGLE"
 sc.display.shading.single_color = (1, 1, 1)
 sc.render.film_transparent = True
+MATCAP = opt("--matcap", None)      # e.g. zebra_h.png, check_reflection_vertical.exr: reflective shading to judge surface smoothness
+if MATCAP:
+    sc.display.shading.light = "MATCAP"
+    sc.display.shading.studio_light = MATCAP
+    sc.render.film_transparent = False
+    sc.world = bpy.data.worlds.new("W")
+    sc.world.color = (0.5, 0.5, 0.5)
 sc.render.resolution_x, sc.render.resolution_y, sc.render.resolution_percentage = 2796, 1440, 100
 sc.view_settings.view_transform = "Standard"
 cam = bpy.data.objects.new("SFCam", bpy.data.cameras.new("SFCam"))
