@@ -36,7 +36,9 @@ POD_Y = -0.15                       # centres the 1.55 deep tilted pod between t
 POD_DEPTH = 0.93                    # pod depth / width (photos 239/240 vs 242)
 CAVITY_R = 0.95
 PK_N = 3.6                         # pocket outline superellipse exponent (higher: straighter sides, a parallel bridge)
-PK_X, PK_Y, PK_A, PK_B = 1.41, 0.0, 1.21, 0.93   # interior pocket: centre x/y, half axes (reference int-front: x 0.17..2.6)
+PK_X, PK_Y, PK_A, PK_B = 1.48, 0.0, 1.14, 0.93   # interior pocket: centre x/y, half axes (x 0.34..2.62: the round tips pass the bridge at 0.25)
+PK_N_IN = 2.2                      # exponent of the inner (bridge side) half of the pocket outline: it hugs the round silicone tips
+RIM_Z = 0.09                       # the interior rim / bridge face sits this far below the seam
 STEM_OFF = 0.12                     # the stem axis sits this far outwards of the head axis (reference pods)
 LED_DROP = 0.78                     # status light below the seam (reference front shot: 0.08 wide)
 # lid hinge axis (x direction): solved from the open lid of the reference end view (121 deg open): the back rim
@@ -53,9 +55,9 @@ HINGE_MID = 0.82                    # half width of the lid plate's centre piece
 HINGE_CLEAR = 0.02                  # clearance of the swept slots
 HINGE_R = 0.09                      # plate corner radius
 HINGE_LUG = 0.13                    # how far the lid plate's centre lug reaches below the seam (it swings into the base)
-HINGE_BAR_Y = (0.46, 0.70)          # one dark trapezoid on the base rim (hinge-inner): y range, half widths at front / back
-HINGE_BAR_HW = (1.05, 1.33)
-HINGE_BAR_Z = (0.012, 0.03)         # top above the seam at the front edge / the arch crown (the lid recess ceiling over the bridge is at +0.07)
+HINGE_BAR_Y = (0.58, 0.82)          # one dark trapezoid on the base rim (hinge-inner): y range, half widths at front / back
+HINGE_BAR_HW = (0.95, 1.25)
+HINGE_BAR_Z = (-0.088, -0.084)      # top relative to the seam: flush with the rim face (SEAM - 0.09), a hair proud
 HINGE_PARTS = {}
 N_LID_RIM = float(sys.argv[sys.argv.index("--nrim") + 1]) if "--nrim" in sys.argv else N_PLAN   # plan exponent at the rim, blended to N_PLAN_LID over 0.6 cm
 N_PLAN_LID = float(sys.argv[sys.argv.index("--nlid") + 1]) if "--nlid" in sys.argv else N_PLAN                    # the lid plan section is boxier than the base's (front-view widths)
@@ -378,7 +380,7 @@ def thumb_scoop():
     return rbox("thumb", w, 0.3, top - (SEAM - h), r, segs=4, center=(0, -D / 2 + depth - 0.15, (top + SEAM - h) / 2))
 
 
-def bathtub(name, cx, cy, a, b, z_top, z_bot, rb, n=2.8, up=False, nr=14, ns=96, rh=None, zf=None, rf=0.12, nf=8):
+def bathtub(name, cx, cy, a, b, z_top, z_bot, rb, n=2.8, up=False, nr=14, ns=96, rh=None, zf=None, rf=0.12, nf=8, n_in=None):
     """Pocket cutter: a superellipse prism (half axes a, b, exponent n) with a rounded bottom corner of radius rb
     (the reference pockets are rounded rectangles hugging the pods). up=True mirrors it (lid bowls: bottom = top)."""
     bm = bmesh.new()
@@ -397,8 +399,9 @@ def bathtub(name, cx, cy, a, b, z_top, z_bot, rb, n=2.8, up=False, nr=14, ns=96,
         for k in range(ns):
             th = 2 * math.pi * k / ns
             c, sn = math.cos(th), math.sin(th)
-            x = (a - inset) * math.copysign(abs(c) ** (2 / n), c)
-            y = (b - inset) * math.copysign(abs(sn) ** (2 / n), sn)
+            ne = n if (n_in is None or c * cx > 0) else n_in    # n_in: the half facing the case centre
+            x = (a - inset) * math.copysign(abs(c) ** (2 / ne), c)
+            y = (b - inset) * math.copysign(abs(sn) ** (2 / ne), sn)
             ring.append(bm.verts.new((cx + x, cy + y, z)))
         rings.append(ring)
     for i in range(len(rings) - 1):
@@ -411,6 +414,66 @@ def bathtub(name, cx, cy, a, b, z_top, z_bot, rb, n=2.8, up=False, nr=14, ns=96,
             v.co.z = 2 * (SEAM) - v.co.z
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return link(name, bm)
+
+
+def back_plateau():
+    """Mask solid for the pocket cutters: the flat rim behind the pods (the bridge widens into a plateau that carries the
+    hinge bar). Its front edge hugs the silicone tips and the pod heads (plan view, mirrored)."""
+    def yp(x):
+        x = abs(x)
+        if x <= 0.8:
+            return 0.52
+        if x <= 1.3:
+            t = (x - 0.8) / 0.5
+            return 0.52 + 0.28 * (0.5 - 0.5 * math.cos(math.pi * t))
+        return 0.80 + 0.15 * (x - 1.3) / 0.3
+    xs = [-1.6 + 3.2 * i / 64 for i in range(65)]
+    pts = [(x, yp(x)) for x in xs] + [(1.6, 1.15), (-1.6, 1.15)]
+    z0, z1 = SEAM - RIM_Z - 0.3, SEAM + 0.6     # a 0.3 thick roof: the pockets stay open underneath
+    bm = bmesh.new()
+    lo = [bm.verts.new((x, y, z0)) for x, y in pts]
+    hi = [bm.verts.new((x, y, z1)) for x, y in pts]
+    n = len(pts)
+    for k in range(n):
+        bm.faces.new((lo[k], lo[(k + 1) % n], hi[(k + 1) % n], hi[k]))
+    bm.faces.new(lo[::-1])
+    bm.faces.new(hi)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return link("plateau", bm)
+
+
+def stem_well(name, o, sgn, gap):
+    """Analytic stem well: a smooth rounded capsule along the stem axis of pod body `o`, a little wider than the grown
+    stem and flaring into the head, so the real body cut removes nothing visible from the pocket floor."""
+    B = PODS["body"]
+    zb, zt = B["sz"][1], -0.45
+    ax = lambda z_: (sgn * (B["sa"][0] + B["ss"][0] * (z_ - B["sa"][2])), B["sa"][1] + B["ss"][1] * (z_ - B["sa"][2]))
+    r_lo = max(B["sr"]) + gap + 0.10
+    rad = lambda z_: r_lo                  # the stem is a plain cylinder up to the head (local z -0.8)
+    zc = zb + 0.15                      # centre of the rounded end cap
+    bm = bmesh.new()
+    rings = []
+    nz, ns = 40, 48
+    prof = [(zc - r_lo * math.cos(math.pi / 2 * i / 8), r_lo * math.sin(math.pi / 2 * i / 8)) for i in range(0, 8)]
+    prof += [(zc + (zt - zc) * i / nz, rad(zc + (zt - zc) * i / nz)) for i in range(0, nz + 1)]
+    prof[-1] = (zt, rad(zt))
+    for z_, r_ in prof:
+        cx_, cy_ = ax(z_)
+        rings.append([bm.verts.new((cx_ + r_ * math.cos(2 * math.pi * k / ns), cy_ + r_ * math.sin(2 * math.pi * k / ns), z_)) for k in range(ns)])
+    bm.verts.ensure_lookup_table()
+    pole = bm.verts.new((*ax(zc - r_lo), zc - r_lo))
+    for i in range(len(rings) - 1):
+        for k in range(ns):
+            bm.faces.new((rings[i][k], rings[i][(k + 1) % ns], rings[i + 1][(k + 1) % ns], rings[i + 1][k]))
+    for k in range(ns):
+        bm.faces.new((pole, rings[0][(k + 1) % ns], rings[0][k]))
+    bm.faces.new(rings[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    c = link(name, bm)
+    for p_ in c.data.polygons:
+        p_.use_smooth = True
+    c.data.transform(o.matrix_world)
+    return c
 
 
 def _rot_about_axis(ob, ang):
@@ -634,7 +697,9 @@ def build_case(mats, clear=()):
     rec = superell("rec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM - gap + 0.5 - 0.07), dome=0.0, nlat=8, nlon=96)
     boolean(base, rec)
     for sx in (-1, 1):  # two pockets hugging the pods (reference: rounded rectangles, a bridge between them)
-        boolean(base, bathtub("pocket_b", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.6, 1.3, n=PK_N, rh=0.8, zf=SEAM - 0.09))
+        pk = bathtub("pocket_b", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.6, 1.3, n=PK_N, rh=0.8, zf=SEAM - RIM_Z, n_in=PK_N_IN)
+        boolean(pk, back_plateau(), "DIFFERENCE")      # the flat rim behind the pods stays at rim level
+        boolean(base, pk)
     for c in clear:
         boolean(base, c, keep=True)
     clean(base)
@@ -909,6 +974,8 @@ def pod_clearance(gap=0.03):
                 c.data.transform(o.matrix_world)
                 out.append(c)
                 continue
+            if o.name.endswith("_Body"):
+                out.append(stem_well(o.name + "_Well", o, 1 if "_L_" in o.name else -1, gap))
             me = bpy.data.meshes.new_from_object(o.evaluated_get(dg))
             me.transform(o.matrix_world)
             me.materials.clear()
