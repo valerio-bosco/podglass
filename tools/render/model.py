@@ -41,6 +41,16 @@ LED_DROP = 0.78                     # status light below the seam (reference fro
 # corner of the closed lid (y = 1.09, z = SEAM + gap) lands on the observed corner
 HINGE_Y = 1.08
 HINGE_Z = SEAM + 0.158
+# hinge hardware (photo of the back + reference hinge-inner): a steel plate flush in the back wall over the seam, a
+# dark bar on the rim behind the pods; the plate halves sit in matching skin slots of base and lid
+HINGE_HW = 1.5                      # plate half width
+HINGE_PLATE_BELOW = 0.28            # plate extent below / above the seam
+HINGE_PLATE_ABOVE = 0.50
+HINGE_SKIN = 0.06                   # plate thickness (it follows the shell)
+HINGE_BAR_Y = (0.78, 0.99)          # dark bar on the base rim: y range, half widths at front / back, top above the seam
+HINGE_BAR_HW = (1.7, 2.0)
+HINGE_BAR_TOP = 0.0
+HINGE_PARTS = {}
 N_LID_RIM = float(sys.argv[sys.argv.index("--nrim") + 1]) if "--nrim" in sys.argv else N_PLAN   # plan exponent at the rim, blended to N_PLAN_LID over 0.6 cm
 N_PLAN_LID = float(sys.argv[sys.argv.index("--nlid") + 1]) if "--nlid" in sys.argv else N_PLAN                    # the lid plan section is boxier than the base's (front-view widths)
 
@@ -324,6 +334,7 @@ def make_materials():
         "mesh": material("Mesh", (0.03, 0.03, 0.034), rough=0.6, bump=(420.0, 0.9)),
         "gold": material("Gold", (0.85, 0.62, 0.25), rough=0.3, metal=1.0),
         "steel": material("Steel", (0.82, 0.82, 0.83), rough=0.28, metal=1.0),
+        "hinge_dark": material("Hinge bar", (0.2, 0.19, 0.2), rough=0.4, metal=0.6),
         "dark": material("Dark", (0.01, 0.01, 0.012), rough=0.5),
         "led": material("LED", (0.6, 1.0, 0.55), rough=0.4, emission=((0.6, 1.0, 0.55), 6.0)),
     }
@@ -343,6 +354,45 @@ def thumb_scoop():
     w, h, depth, r = 2.6, 0.15, 0.07, 0.07
     top = SEAM + 0.2
     return rbox("thumb", w, 0.3, top - (SEAM - h), r, segs=4, center=(0, -D / 2 + depth - 0.15, (top + SEAM - h) / 2))
+
+
+def hinge_cuts(base, lid, gap):
+    """Cut the plate slots (back wall skin) and the bar slot into base and lid; the matching solids go to
+    HINGE_PARTS for build_hardware. Rotating the lid about its axis never sweeps them into the base."""
+    def skin(z0, z1):
+        sh = traced_shell("hs")
+        boolean(sh, rbox("hb", 2 * HINGE_HW, 4.0, z1 - z0, 0.0, segs=1, center=(0, 1.0 + 2.0 - 0.3, (z0 + z1) / 2)), "INTERSECT")
+        boolean(sh, inner_shell("hi", wall=HINGE_SKIN))
+        return sh
+    z_lo = SEAM - HINGE_PLATE_BELOW
+    z_hi = SEAM + HINGE_PLATE_ABOVE
+    plate_b = skin(z_lo, SEAM - gap - 0.01)
+    plate_l = skin(SEAM + gap + 0.01, z_hi)
+    for ob, pl in ((base, skin(z_lo - 0.02, SEAM - gap + 0.02)), (lid, skin(SEAM + gap - 0.02, z_hi + 0.02))):
+        boolean(ob, pl)
+    # dark bar: trapezoid prism in plan, sunk into the base rim and standing HINGE_BAR_TOP above the seam
+    y0, y1 = HINGE_BAR_Y
+    zb, zt = SEAM - 0.3, SEAM + HINGE_BAR_TOP
+    bm = bmesh.new()
+    pts = [(-HINGE_BAR_HW[0], y0), (HINGE_BAR_HW[0], y0), (HINGE_BAR_HW[1], y1), (-HINGE_BAR_HW[1], y1)]
+    lo = [bm.verts.new((x, y, zb)) for x, y in pts]
+    hi = [bm.verts.new((x, y, zt)) for x, y in pts]
+    bm.faces.new(lo[::-1])
+    bm.faces.new(hi)
+    for i in range(4):
+        bm.faces.new((lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bar = link("Case_HingeBar", bm)
+    cut = bar.copy()
+    cut.data = bar.data.copy()
+    bpy.context.collection.objects.link(cut)
+    boolean(base, cut)
+    plate_b.name, plate_l.name = "Case_Hinge", "Case_HingeLid"
+    HINGE_PARTS.update(base=plate_b, lid=plate_l, bar=bar)
+    for ob in (plate_b, plate_l):
+        clean(ob)
+        bevel(ob, 0.02, 2, angle=35)
+    clean(base)
 
 
 # ---- case ------------------------------------------------------------------------------------
@@ -411,6 +461,7 @@ def build_case(mats, clear=()):
     boolean(lid, lrec)
     for c in clear:
         boolean(lid, c)
+    hinge_cuts(base, lid, gap)
     clean(lid)
     bevel(lid, 0.1, 2, angle=35)
     smooth(lid, 35, weighted=True)
@@ -436,7 +487,12 @@ def build_case(mats, clear=()):
 
 
 def build_hardware(mats, lid):
-    # no hinge plate: the reference back shot shows a plain wall
+    hp = HINGE_PARTS
+    hp["base"].data.materials.append(mats["steel"])
+    hp["lid"].data.materials.append(mats["steel"])
+    hp["bar"].data.materials.append(mats["hinge_dark"])
+    for o in hp.values():
+        smooth(o, 35)
     led = cyl("Case_LED", 0.045, 0.03, (0, -D / 2 + 0.01, SEAM - LED_DROP), rot=(math.pi / 2, 0, 0), verts=24)
     led.data.materials.append(mats["led"])
 
@@ -465,6 +521,9 @@ def build_hardware(mats, lid):
     bpy.context.scene.cursor.location = (0, HINGE_Y, HINGE_Z)
     activate(lid)
     bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+    pl = hp["lid"]
+    pl.parent = lid
+    pl.matrix_parent_inverse = lid.matrix_world.inverted()
     return led, pin
 
 
