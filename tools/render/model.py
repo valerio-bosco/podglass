@@ -36,8 +36,8 @@ POD_Y = -0.15                       # centres the 1.55 deep tilted pod between t
 POD_DEPTH = 0.93                    # pod depth / width (photos 239/240 vs 242)
 CAVITY_R = 0.95
 PK_N = 3.6                         # pocket outline superellipse exponent (higher: straighter sides, a parallel bridge)
-PK_X, PK_Y, PK_A, PK_B = 1.48, 0.0, 1.14, 0.93   # interior pocket: centre x/y, half axes (x 0.34..2.62: the round tips pass the bridge at 0.25)
-PK_N_IN = 2.2                      # exponent of the inner (bridge side) half of the pocket outline: it hugs the round silicone tips
+PK_X, PK_Y, PK_A, PK_B = 1.39, -0.06, 1.22, 0.86   # interior pocket: centre x/y, half axes (reference int-front: x 0.17..2.61, a constant 0.34 bridge)
+PK_N_IN = 7.0                      # exponent of the inner (bridge side) half of the outline: a straight edge, constant-width bridge
 RIM_Z = 0.09                       # the interior rim / bridge face sits this far below the seam
 STEM_OFF = 0.12                     # the stem axis sits this far outwards of the head axis (reference pods)
 LED_DROP = 0.78                     # status light below the seam (reference front shot: 0.08 wide)
@@ -55,10 +55,11 @@ HINGE_MID = 0.82                    # half width of the lid plate's centre piece
 HINGE_CLEAR = 0.02                  # clearance of the swept slots
 HINGE_R = 0.09                      # plate corner radius
 HINGE_LUG = 0.13                    # how far the lid plate's centre lug reaches below the seam (it swings into the base)
-HINGE_BAR_Y = (0.58, 0.82)          # one dark trapezoid on the base rim (hinge-inner): y range, half widths at front / back
-HINGE_BAR_HW = (0.95, 1.25)
+HINGE_BAR_Y = (0.76, 0.92)          # one dark trapezoid on the base rim (hinge-inner): y range, half widths at front / back
+HINGE_BAR_HW = (1.15, 1.30)
 HINGE_BAR_Z = (-0.088, -0.084)      # top relative to the seam: flush with the rim face (SEAM - 0.09), a hair proud
 HINGE_PARTS = {}
+WELLS = []                          # world-space stem well axes (p0, p1), for the floor blend
 N_LID_RIM = float(sys.argv[sys.argv.index("--nrim") + 1]) if "--nrim" in sys.argv else N_PLAN   # plan exponent at the rim, blended to N_PLAN_LID over 0.6 cm
 N_PLAN_LID = float(sys.argv[sys.argv.index("--nlid") + 1]) if "--nlid" in sys.argv else N_PLAN                    # the lid plan section is boxier than the base's (front-view widths)
 
@@ -393,6 +394,8 @@ def bathtub(name, cx, cy, a, b, z_top, z_bot, rb, n=2.8, up=False, nr=14, ns=96,
                                                   for t in [math.pi / 2 - i / nf * math.pi / 2 for i in range(1, nf + 1)]]
     prof = top + [(0.0, z_bot + rb)] + [((rb if rh is None else rh) * (1 - math.cos(t)), z_bot + rb - rb * math.sin(t))
                                                       for t in [i / nr * math.pi / 2 for i in range(1, nr + 1)]]
+    r_end = rb if rh is None else rh
+    prof += [(r_end + (0.8 * b - r_end) * k / 5, z_bot) for k in range(1, 6)]     # concentric rings across the floor (no long sliver triangles)
     rings = []
     for inset, z in prof:
         ring = []
@@ -416,30 +419,23 @@ def bathtub(name, cx, cy, a, b, z_top, z_bot, rb, n=2.8, up=False, nr=14, ns=96,
     return link(name, bm)
 
 
-def back_plateau():
-    """Mask solid for the pocket cutters: the flat rim behind the pods (the bridge widens into a plateau that carries the
-    hinge bar). Its front edge hugs the silicone tips and the pod heads (plan view, mirrored)."""
-    def yp(x):
-        x = abs(x)
-        if x <= 0.8:
-            return 0.52
-        if x <= 1.3:
-            t = (x - 0.8) / 0.5
-            return 0.52 + 0.28 * (0.5 - 0.5 * math.cos(math.pi * t))
-        return 0.80 + 0.15 * (x - 1.3) / 0.3
-    xs = [-1.6 + 3.2 * i / 64 for i in range(65)]
-    pts = [(x, yp(x)) for x in xs] + [(1.6, 1.15), (-1.6, 1.15)]
-    z0, z1 = SEAM - RIM_Z - 0.3, SEAM + 0.6     # a 0.3 thick roof: the pockets stay open underneath
+def blend_wells(obj, reach=0.95, iters=5, fac=0.5, zmax=2.4):
+    """Fillet the stem wells into the pocket floor: a few Laplacian passes on the vertices around each well axis
+    (the boolean leaves slivers and a hard crater edge there)."""
     bm = bmesh.new()
-    lo = [bm.verts.new((x, y, z0)) for x, y in pts]
-    hi = [bm.verts.new((x, y, z1)) for x, y in pts]
-    n = len(pts)
-    for k in range(n):
-        bm.faces.new((lo[k], lo[(k + 1) % n], hi[(k + 1) % n], hi[k]))
-    bm.faces.new(lo[::-1])
-    bm.faces.new(hi)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    return link("plateau", bm)
+    bm.from_mesh(obj.data)
+    def near(v):
+        for p0, p1 in WELLS:
+            d = p1 - p0
+            t = min(max((v.co - p0).dot(d) / d.length_squared, 0.0), 1.0)
+            if (v.co - (p0 + d * t)).length < reach and v.co.z < zmax:
+                return True
+        return False
+    sel = [v for v in bm.verts if near(v) and not v.is_boundary and v.normal.z > 0.2 and all(math.hypot(abs(v.co.x) - hx, v.co.y) > 0.16 for hx in (1.40, 1.44, 1.67, 1.90))]
+    for _ in range(iters):
+        bmesh.ops.smooth_vert(bm, verts=sel, factor=fac, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    bm.to_mesh(obj.data)
+    bm.free()
 
 
 def stem_well(name, o, sgn, gap):
@@ -449,7 +445,9 @@ def stem_well(name, o, sgn, gap):
     zb, zt = B["sz"][1], -0.45
     ax = lambda z_: (sgn * (B["sa"][0] + B["ss"][0] * (z_ - B["sa"][2])), B["sa"][1] + B["ss"][1] * (z_ - B["sa"][2]))
     r_lo = max(B["sr"]) + gap + 0.10
-    rad = lambda z_: r_lo                  # the stem is a plain cylinder up to the head (local z -0.8)
+    def rad(z_):                           # a plain cylinder, flaring (cosine) into a fillet where it meets the pocket floor
+        t = min(max((z_ - (zb + 0.55)) / 0.7, 0.0), 1.0)
+        return r_lo + 0.22 * (0.5 - 0.5 * math.cos(math.pi * t))
     zc = zb + 0.15                      # centre of the rounded end cap
     bm = bmesh.new()
     rings = []
@@ -473,6 +471,7 @@ def stem_well(name, o, sgn, gap):
     for p_ in c.data.polygons:
         p_.use_smooth = True
     c.data.transform(o.matrix_world)
+    WELLS.append((o.matrix_world @ Vector((*ax(zb), zb)), o.matrix_world @ Vector((*ax(zt), zt))))
     return c
 
 
@@ -697,12 +696,12 @@ def build_case(mats, clear=()):
     rec = superell("rec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM - gap + 0.5 - 0.07), dome=0.0, nlat=8, nlon=96)
     boolean(base, rec)
     for sx in (-1, 1):  # two pockets hugging the pods (reference: rounded rectangles, a bridge between them)
-        pk = bathtub("pocket_b", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.6, 1.3, n=PK_N, rh=0.8, zf=SEAM - RIM_Z, n_in=PK_N_IN)
-        boolean(pk, back_plateau(), "DIFFERENCE")      # the flat rim behind the pods stays at rim level
+        pk = bathtub("pocket_b", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.6, 0.8, n=PK_N, rh=0.5, zf=SEAM - RIM_Z, n_in=PK_N_IN, ns=192)
         boolean(base, pk)
     for c in clear:
         boolean(base, c, keep=True)
     clean(base)
+    blend_wells(base)
     bevel(base, 0.1, 2, angle=35)
     smooth(base, 35, weighted=True)
 
@@ -710,7 +709,7 @@ def build_case(mats, clear=()):
     lid = shell("Case_Lid")
     boolean(lid, rbox("keep", W * 2, D * 2, LID_H * 2, 0.0, segs=1, center=(0, 0, H - LID_H + gap + LID_H)), "INTERSECT")
     for sx in (-1, 1):
-        c = bathtub("bowl", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.05, 1.35, n=PK_N, up=True, rh=0.8, zf=SEAM - 0.09)
+        c = bathtub("bowl", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.05, 1.35, n=PK_N, up=True, rh=0.8, zf=SEAM - 0.09, n_in=PK_N_IN)
         # the traced top falls towards the ends: keep the bowl one wall inside the shell or it cuts through
         boolean(c, inner_shell("inner"), "INTERSECT")
         boolean(lid, c)
@@ -986,6 +985,18 @@ def pod_clearance(gap=0.03):
             m.mid_level = 0.0
             m.strength = gap
             apply_mod(c, m)
+            if o.name.endswith("_Body"):
+                # keep only the head: below local z -0.85 the stem is covered by the analytic well (no stem faces in the pocket)
+                bmh = bmesh.new()
+                bmh.from_mesh(c.data)
+                no = o.matrix_world.to_3x3() @ Vector((0, 0, 1))
+                geom = bmh.verts[:] + bmh.edges[:] + bmh.faces[:]
+                r_ = bmesh.ops.bisect_plane(bmh, geom=geom, dist=1e-6, plane_co=o.matrix_world @ Vector((0, 0, -0.85)), plane_no=no, clear_inner=True)
+                edges = [e_ for e_ in bmh.edges if e_.is_boundary]
+                bmesh.ops.holes_fill(bmh, edges=edges, sides=0)
+                bmesh.ops.recalc_face_normals(bmh, faces=bmh.faces)
+                bmh.to_mesh(c.data)
+                bmh.free()
             out.append(c)
     return out
 
