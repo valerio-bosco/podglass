@@ -35,7 +35,7 @@ POD_YAW = 30.0                      # the tips turn towards the case centre (rot
 POD_Y = -0.15                       # centres the 1.55 deep tilted pod between the walls
 POD_DEPTH = 0.93                    # pod depth / width (photos 239/240 vs 242)
 CAVITY_R = 0.95
-PK_X, PK_Y, PK_A, PK_B = 1.4, 0.05, 1.22, 0.85   # interior pocket: centre x/y, half axes (reference int-front: x 0.17..2.6)
+PK_X, PK_Y, PK_A, PK_B = 1.41, 0.0, 1.21, 0.93   # interior pocket: centre x/y, half axes (reference int-front: x 0.17..2.6)
 STEM_OFF = 0.12                     # the stem axis sits this far outwards of the head axis (reference pods)
 LED_DROP = 0.78                     # status light below the seam (reference front shot: 0.08 wide)
 # lid hinge axis (x direction): solved from the open lid of the reference end view (121 deg open): the back rim
@@ -346,12 +346,12 @@ def thumb_scoop():
     return rbox("thumb", w, 0.3, top - (SEAM - h), r, segs=4, center=(0, -D / 2 + depth - 0.15, (top + SEAM - h) / 2))
 
 
-def bathtub(name, cx, cy, a, b, z_top, z_bot, rb, n=2.3, up=False, nr=14, ns=96):
+def bathtub(name, cx, cy, a, b, z_top, z_bot, rb, n=2.8, up=False, nr=14, ns=96, rh=None):
     """Pocket cutter: a superellipse prism (half axes a, b, exponent n) with a rounded bottom corner of radius rb
     (the reference pockets are rounded rectangles hugging the pods). up=True mirrors it (lid bowls: bottom = top)."""
     bm = bmesh.new()
     # (inset, z) from the wall down round the corner: inset 0 -> rb
-    prof = [(0.0, z_top + 0.3), (0.0, z_bot + rb)] + [(rb * (1 - math.cos(t)), z_bot + rb - rb * math.sin(t))
+    prof = [(0.0, z_top + 0.3), (0.0, z_bot + rb)] + [((rb if rh is None else rh) * (1 - math.cos(t)), z_bot + rb - rb * math.sin(t))
                                                       for t in [i / nr * math.pi / 2 for i in range(1, nr + 1)]]
     rings = []
     for inset, z in prof:
@@ -406,12 +406,7 @@ def build_case(mats, clear=()):
     rec = superell("rec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM - gap + 0.5 - 0.07), dome=0.0, nlat=8, nlon=96)
     boolean(base, rec)
     for sx in (-1, 1):  # two pockets hugging the pods (reference: rounded rectangles, a bridge between them)
-        boolean(base, bathtub("pocket_b", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.35, 0.55))
-        sp = [(0, SEAM - 2.4), (0.3, SEAM - 2.38), (0.42, SEAM - 2.2), (0.42, SEAM - 0.8), (0, SEAM - 0.8)]
-        c = lathe("cavs", sp, steps=40)
-        c.scale = (1.0, 0.85, 1.0)
-        c.location = (sx * (POD_X + STEM_OFF * POD_SCALE), 0, 0)
-        boolean(base, c)
+        boolean(base, bathtub("pocket_b", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.6, 1.3, rh=0.8))
     for c in clear:
         boolean(base, c, keep=True)
     clean(base)
@@ -422,7 +417,7 @@ def build_case(mats, clear=()):
     lid = shell("Case_Lid")
     boolean(lid, rbox("keep", W * 2, D * 2, LID_H * 2, 0.0, segs=1, center=(0, 0, H - LID_H + gap + LID_H)), "INTERSECT")
     for sx in (-1, 1):
-        c = bathtub("bowl", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.05, 0.55, up=True)
+        c = bathtub("bowl", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.05, 1.35, up=True, rh=0.8)
         # the traced top falls towards the ends: keep the bowl one wall inside the shell or it cuts through
         boolean(c, inner_shell("inner"), "INTERSECT")
         boolean(lid, c)
