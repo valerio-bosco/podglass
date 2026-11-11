@@ -51,10 +51,10 @@ HINGE_SKIN = 0.06                   # plate thickness (it follows the shell)
 HINGE_MID = 0.82                    # half width of the lid plate's centre piece that reaches below the seam
 HINGE_CLEAR = 0.02                  # clearance of the swept slots
 HINGE_R = 0.09                      # plate corner radius
-HINGE_BAR_TOP2 = 0.08               # the bar is higher at the back
-HINGE_BAR_Y = (0.66, 0.84)          # dark bar on the base rim: y range, half widths at front / back, top above the seam
-HINGE_BAR_HW = (1.5, 1.7)
-HINGE_BAR_TOP = 0.22
+HINGE_LUG = 0.13                    # how far the lid plate's centre lug reaches below the seam (it swings into the base)
+HINGE_BAR_Y = (0.46, 0.70)          # one dark trapezoid on the base rim (hinge-inner): y range, half widths at front / back
+HINGE_BAR_HW = (1.05, 1.33)
+HINGE_BAR_Z = (0.012, 0.03)         # top above the seam at the front edge / the arch crown (the lid recess ceiling over the bridge is at +0.07)
 HINGE_PARTS = {}
 N_LID_RIM = float(sys.argv[sys.argv.index("--nrim") + 1]) if "--nrim" in sys.argv else N_PLAN   # plan exponent at the rim, blended to N_PLAN_LID over 0.6 cm
 N_PLAN_LID = float(sys.argv[sys.argv.index("--nlid") + 1]) if "--nlid" in sys.argv else N_PLAN                    # the lid plan section is boxier than the base's (front-view widths)
@@ -483,16 +483,84 @@ def _sheet(name, x0, x1, z0, z1, d_in, d_out, round_corners=(), r=HINGE_R, dx=0.
     return link(name, bm)
 
 
+def _lug_sweep(name, x0, x1, z0, z1, din, dout, theta, nx=14, nr=40, cl=HINGE_CLEAR):
+    """Analytic solid swept by the lid plate's centre lug (a plate on the back wall over [x0, x1] x [z0, z1], din
+    below / dout above the wall) while the lid opens by `theta` rad: per x slice the yz region is bounded by two
+    radial edges and two arcs about the hinge axis, lofted along x. One closed manifold, no boolean chain."""
+    import numpy as np
+    phis = np.linspace(-math.pi, math.pi, 7200)
+    ring_n = None
+    bm = bmesh.new()
+    slices = []
+    for i in range(nx + 1):
+        x = x0 - cl + (x1 - x0 + 2 * cl) * i / nx
+        yw = _back_y(min(abs(x), 1.4), 0.5 * (z0 + z1))
+        ya, yb = yw - din - cl - HINGE_Y, yw + dout + cl - HINGE_Y        # dy range, relative to the axis
+        za, zb_ = z0 - cl - HINGE_Z, z1 + cl - HINGE_Z
+        cy, cz = min(max(0.0, ya), yb), min(max(0.0, za), zb_)
+        rmin = max(math.hypot(cy, cz), 1e-3)
+        rmax = max(math.hypot(yy, zz) for yy in (ya, yb) for zz in (za, zb_))
+        rs = np.linspace(rmin + 0.002, rmax - 0.002, nr)
+        lo, hi = [], []
+        for r in rs:
+            py, pz = r * np.cos(phis), r * np.sin(phis)
+            ok = np.where((py >= ya) & (py <= yb) & (pz >= za) & (pz <= zb_))[0]
+            if len(ok) == 0:          # circle just grazes the rectangle
+                ok = [int(np.argmin(np.abs(phis - math.atan2(cz, cy))))]
+            lo.append(phis[ok[0]])
+            hi.append(phis[ok[-1]])
+        # the lid turns by -theta (rotation about +x by -theta moves phi by -theta)
+        pts = [(r, h) for r, h in zip(rs, hi)]
+        k = 8
+        pts += [(rmax, hi[-1] + (lo[-1] - theta - hi[-1]) * j / k) for j in range(1, k)]
+        pts += [(r, l - theta) for r, l in zip(rs[::-1], lo[::-1])]
+        pts += [(rmin, lo[0] - theta + (hi[0] - lo[0] + theta) * j / k) for j in range(1, k)]
+        slices.append([bm.verts.new((x, HINGE_Y + r * math.cos(p), HINGE_Z + r * math.sin(p))) for r, p in pts])
+    n = len(slices[0])
+    for i in range(nx):
+        for j in range(n):
+            bm.faces.new((slices[i][j], slices[i][(j + 1) % n], slices[i + 1][(j + 1) % n], slices[i + 1][j]))
+    bm.faces.new(slices[0][::-1])
+    bm.faces.new(slices[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return link(name, bm)
+
+
+def _bar(zb):
+    """One continuous dark trapezoid on the base rim (hinge-inner): plan trapezoid, low arched top, flat sunk bottom."""
+    y0, y1 = HINGE_BAR_Y
+    nu, nv = 48, 6
+    bm = bmesh.new()
+    def top(u, v):
+        hw = HINGE_BAR_HW[0] + (HINGE_BAR_HW[1] - HINGE_BAR_HW[0]) * v
+        z = SEAM + HINGE_BAR_Z[0] + (HINGE_BAR_Z[1] - HINGE_BAR_Z[0]) * (1 - u * u) * (1.0 - 0.6 * v)
+        return (u * hw, y0 + (y1 - y0) * v, z)
+    g = [[bm.verts.new(top(-1 + 2 * i / nu, j / nv)) for i in range(nu + 1)] for j in range(nv + 1)]
+    for j in range(nv):
+        for i in range(nu):
+            bm.faces.new((g[j][i], g[j][i + 1], g[j + 1][i + 1], g[j + 1][i]))
+    ring = [g[0][i] for i in range(nu)] + [g[j][nu] for j in range(nv)] + [g[nv][i] for i in range(nu, 0, -1)] + [g[j][0] for j in range(nv, 0, -1)]
+    low = [bm.verts.new((v.co.x, v.co.y, zb)) for v in ring]
+    for k in range(len(ring)):
+        k2 = (k + 1) % len(ring)
+        bm.faces.new((ring[k], ring[k2], low[k2], low[k]))
+    bm.faces.new(low[::-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return link("Case_HingeBar", bm)
+
+
 def hinge_cuts(base, lid, gap):
     """Steel plate flush in the back wall across the seam (photo 248): the lid half reaches below the seam in the
-    middle, the base half only at the ends; plus a dark block on the base rim. Slots are cut into base and lid, the
-    moving part's sweep is cut out of the other half. Solids go to HINGE_PARTS for build_hardware."""
+    middle (a short lug), the base half only at the ends; plus ONE dark trapezoid on the base rim in front of the lug's
+    swing. Slots are cut into base and lid; the lug's analytic sweep is cut out of the base. Solids go to
+    HINGE_PARTS for build_hardware."""
     hw, mid, e, m = HINGE_HW, HINGE_MID, 0.01, 0.012
     zb0, zt, zs_ = SEAM - HINGE_PLATE_BELOW, SEAM + HINGE_PLATE_ABOVE, SEAM + gap + e
+    zl = SEAM - HINGE_LUG
     sk = HINGE_SKIN
     top_r = ((1, 1), (-1, 1))
     upper = lambda din, dout, mg: _sheet("u", -hw - mg, hw + mg, zs_ - mg, zt + mg, din, dout, top_r, HINGE_R + mg)
-    centre = lambda din, dout, mg: _sheet("c", -mid - mg, mid + mg, zb0 - mg, zs_ + 0.002, din, dout, ((1, -1), (-1, -1)) if mg == 0 else (), HINGE_R)
+    centre = lambda din, dout, mg: _sheet("c", -mid - mg, mid + mg, zl - mg, zs_ + 0.002, din, dout, ((1, -1), (-1, -1)) if mg == 0 else (), HINGE_R)
     bend = lambda sgn, din, dout, mg: _sheet("b", min(sgn * (mid + 0.03) - mg, sgn * hw - mg) if sgn > 0 else -hw - mg,
                                              (hw + mg) if sgn > 0 else -(mid + 0.03) + mg, zb0 - mg, SEAM - gap - e + mg, din, dout,
                                              ((1, -1),) if sgn > 0 else ((-1, -1),), HINGE_R)
@@ -512,34 +580,20 @@ def hinge_cuts(base, lid, gap):
     boolean(lid, upper(sk, 0.3, m))
     boolean(base, bend(1, sk, 0.3, m))
     boolean(base, bend(-1, sk, 0.3, m))
-    ctr = centre(sk, 0.0, 0)
-    _sweep_cut(base, ctr, -1)     # the lid plate's centre piece over the opening, in the base frame
-    bpy.data.objects.remove(ctr, do_unlink=True)
-    # dark block on the base rim (hinge-inner): trapezoid in plan, sunk into the rim, raised HINGE_BAR_TOP
-    y0, y1 = HINGE_BAR_Y
-    zb, zt2 = SEAM - 0.3, SEAM + HINGE_BAR_TOP
-    bm = bmesh.new()
-    pts = [(-HINGE_BAR_HW[0], y0), (HINGE_BAR_HW[0], y0), (HINGE_BAR_HW[1], y1), (-HINGE_BAR_HW[1], y1)]
-    lo = [bm.verts.new((x, y, zb)) for x, y in pts]
-    hi = [bm.verts.new((x, y, zt2 + (HINGE_BAR_TOP2 if i >= 2 else 0.0))) for i, (x, y) in enumerate(pts)]
-    bm.faces.new(lo[::-1])
-    bm.faces.new(hi)
-    for i in range(4):
-        bm.faces.new((lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]))
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    bar = link("Case_HingeBar", bm)
-    boolean(bar, rbox("notch", 2 * (HINGE_MID + 0.03), 1.0, 1.0, 0.0, segs=1, center=(0, 1.0, SEAM - 0.2 + 0.5)))  # the plate's centre piece swings through here
+    sweep = _lug_sweep("lug_sweep", -mid, mid, zl, zs_ + 0.002, sk, 0.0, math.radians(125.0))   # the lug's swing, base frame
+    boolean(base, sweep)
+    bar = _bar(SEAM - 0.3)
     cut = bar.copy()
     cut.data = bar.data.copy()
     bpy.context.collection.objects.link(cut)
     boolean(base, cut)
-    _sweep_cut(lid, bar, +1, top=102.0)   # the lid frame sees the bar swing down and away: only the start overlaps lid material
     plate_b = bpy.data.objects[plate_b.name]
     plate_b.name, plate_l.name = "Case_Hinge", "Case_HingeLid"
     HINGE_PARTS.update(base=plate_b, lid=plate_l, bar=bar)
     for ob in (plate_b, plate_l):
         clean(ob)
         bevel(ob, 0.015, 2, angle=35)
+    bevel(bar, 0.015, 2, angle=35)
     clean(base)
 
 
@@ -568,7 +622,6 @@ def build_case(mats, clear=()):
     boolean(base, rbox("port", 1.0, 0.3, 1.0, 0.14, segs=6, center=(0.0, 0.0, 0.0)))
     for hx in (-1.40, 1.44, 1.67, 1.90):   # see-through in the reference bottom shot: up into the pod cavity
         boolean(base, cyl("hole", 0.063, 4.4, (hx, 0.0, 0.0), verts=16))
-    boolean(base, cyl("ledcut", 0.045, 0.1, (0, -D / 2, SEAM - LED_DROP), rot=(math.pi / 2, 0, 0), verts=24))
     boolean(base, thumb_scoop())
     # recessed top face: a thin rim stands around the interior (photos 242/243)
     rec = superell("rec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM - gap + 0.5 - 0.07), dome=0.0, nlat=8, nlon=96)
@@ -625,7 +678,9 @@ def build_hardware(mats, lid):
         o.data.materials.append(mats[m])
     for o in hp.values():
         smooth(o, 35)
-    led = cyl("Case_LED", 0.045, 0.03, (0, -D / 2 + 0.01, SEAM - LED_DROP), rot=(math.pi / 2, 0, 0), verts=24)
+    # status light: a disc sunk in the front wall, its face 0.003 proud of the surface (no cut in the base: no slivers)
+    yf = -_back_y(0.0, SEAM - LED_DROP) - 0.003
+    led = cyl("Case_LED", 0.04, 0.06, (0, yf + 0.03, SEAM - LED_DROP), rot=(math.pi / 2, 0, 0), verts=32)
     led.data.materials.append(mats["led"])
 
     # pairing button: a thin engraved ring on the back, 0.57 wide, 1.18 below the seam (reference back shot)
