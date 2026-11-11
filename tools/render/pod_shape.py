@@ -2,8 +2,9 @@
 
 The table is traced from the reference pod silhouettes (tools/render/sf): sections of the head+stem
 loft, in the pod-root frame of the LEFT pod (x grows towards the case centre). `sgn` mirrors it for the right pod.
-  rows: [z, cx, cy, hx, hy]  elliptical section centred at (cx, cy) with half axes hx (x) and hy (y), top to bottom
-  tip:  {"pos": [x, y, z], "dir": [x, y, z], "sr": radial scale, "sl": length scale} of TIP_PROF in the root frame
+  rows: [z, cx, cy, hx, hy, psi, n]  section centred at (cx, cy), half axes hx (x) and hy (y), rotated by psi about z,
+        superellipse exponent n (2 = ellipse), top to bottom
+  tip:  {"pos": [x, y, z], "dir": [x, y, z], "ecc", "roll"} of the lathe tip_prof (radius, z along the axis) in the root frame
 """
 import json
 import math
@@ -17,15 +18,26 @@ def load(path=PATH):
     return json.load(open(path))
 
 
+def section(row, sgn=1, nlon=64):
+    """Ring of one row [z, cx, cy, hx, hy(, psi, n)]: superellipse |x/hx|^n + |y/hy|^n = 1 (n=2: ellipse) rotated
+    by psi about z and centred at (cx, cy)."""
+    z, cx, cy, hx, hy = row[:5]
+    psi = row[5] if len(row) > 5 else 0.0
+    n = row[6] if len(row) > 6 else 2.0
+    cp, sp = math.cos(psi), math.sin(psi)
+    ring = []
+    for k in range(nlon):
+        t = 2 * math.pi * k / nlon
+        c, s = math.cos(t), math.sin(t)
+        x = hx * math.copysign(abs(c) ** (2.0 / n), c)
+        y = hy * math.copysign(abs(s) ** (2.0 / n), s)
+        ring.append((sgn * (cx + x * cp - y * sp), cy + x * sp + y * cp, z))
+    return ring
+
+
 def body_rings(rows, sgn=1, nlon=64):
     """List of rings (lists of (x, y, z)) and the two pole points (top, bottom)."""
-    rings = []
-    for z, cx, cy, hx, hy in rows:
-        ring = []
-        for k in range(nlon):
-            t = 2 * math.pi * k / nlon
-            ring.append((sgn * (cx + hx * math.cos(t)), cy + hy * math.sin(t), z))
-        rings.append(ring)
+    rings = [section(r, sgn, nlon) for r in rows]
     z0, cx0, cy0 = rows[0][0], rows[0][1], rows[0][2]
     z1, cx1, cy1 = rows[-1][0], rows[-1][1], rows[-1][2]
     return rings, (sgn * cx0, cy0, z0 + 0.012), (sgn * cx1, cy1, z1 - 0.04)
@@ -37,7 +49,7 @@ def smooth_rows(rows, passes=2):
     for _ in range(passes):
         n = [list(x) for x in r]
         for i in range(1, len(r) - 1):
-            for j in range(1, 5):
+            for j in range(1, len(r[i])):
                 n[i][j] = (r[i - 1][j] + 2 * r[i][j] + r[i + 1][j]) / 4
         r = n
     return r

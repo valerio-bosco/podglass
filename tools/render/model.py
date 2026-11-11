@@ -485,11 +485,9 @@ import pod_shape  # noqa: E402
 
 PODS = pod_shape.load()
 REF_ROOT = PODS["root"]                # root of the left pod in the reference (cm, case frame)
-_pm = PODS["tip"]["pm"]
-# silicone tip profile (radius, z along the tip axis): bulb widest at the head, large opening; the last
-# three points are the recess around the mesh
-TIP_PROF = [(r * PODS["tip"]["sr"] * (_pm[i - 1] if 1 <= i <= 6 else 1.0), z * PODS["tip"]["sl"])
-            for i, (r, z) in enumerate(PODS["tip_prof"])]
+# silicone tip profile (radius, z along the tip axis), traced from the reference (tools/render/profiles_pod.json): bulb widest
+# near the head, the last three points are the opening and the recess around the mesh
+TIP_PROF = [tuple(p) for p in PODS["tip_prof"]]
 
 
 def build_pod(name, mats):
@@ -498,7 +496,7 @@ def build_pod(name, mats):
     sgn = 1 if name.endswith("_L") else -1    # x towards the case centre for the left pod; mirrored for the right
 
     # head + stem: one lofted surface of elliptical sections (profiles_pod.json: [z, cx, cy, hx, hy]), no seams
-    rows = pod_shape.smooth_rows(PODS["rows"], 14)
+    rows = pod_shape.smooth_rows(PODS["rows"], 10)
     rings, top, bot = pod_shape.body_rings(rows, sgn, 64)
     bm = bmesh.new()
     vr = [[bm.verts.new(p_) for p_ in ring] for ring in rings]
@@ -517,17 +515,17 @@ def build_pod(name, mats):
     head.data.materials.clear()
     head.data.materials.append(mats["white"])
     head.parent = root
-    zbot = rows[-1][0]
-    sx0 = sgn * rows[-1][1]
-    # dark mic opening on the very bottom of the stem
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12,
-                                         location=(sx0, rows[-1][2], zbot + 0.02))
+    # dark mic opening on the flat bottom of the stem: on the last wide section
+    j = max(i for i, r_ in enumerate(rows) if r_[3] > 0.15 and r_[4] > 0.15)
+    zj, cxj, cyj, hxj, hyj = rows[j][:5]
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12, location=(sgn * cxj, cyj, zj - 0.02))
     o = bpy.context.active_object
     o.name = name + "_Mic"
-    o.scale = (rows[-1][3] * 0.8, rows[-1][4] * 0.8, 0.05)
+    o.scale = (hxj * 0.6, hyj * 0.6, 0.04)
     o.data.materials.append(mats["dark"])
     bpy.ops.object.shade_smooth()
     o.parent = root
+    sx0 = sgn * rows[j][1]
 
     # silicone tip: built along +z, the TipRig empty aims it (position and direction fitted to the reference)
     rig = bpy.data.objects.new(name + "_TipRig", None)
@@ -536,12 +534,16 @@ def build_pod(name, mats):
     pos, dvec = pod_shape.tip_matrix_args(PODS["tip"], sgn)
     rig.location = pos
     rig.rotation_euler = Vector((0, 0, 1)).rotation_difference(Vector(dvec)).to_euler()
+    # the tip is slightly oval: scaled by ecc along an axis rolled by -roll about its own axis (mirrored for the right pod)
+    oval = (0, 0, -sgn * PODS["tip"].get("roll", 0.0)), (1, PODS["tip"].get("ecc", 1.0), 1)
     tip = lathe(name + "_Tip", TIP_PROF, steps=56)
     tip.data.materials.append(mats["grey_tip"])
     tip.parent = rig
-    mesh = cyl(name + "_Mesh", 0.3, 0.02, (0, 0, 0.36), verts=40)
+    tip.rotation_euler, tip.scale = oval
+    mesh = cyl(name + "_Mesh", 0.245, 0.02, (0, 0, TIP_PROF[-1][1] + 0.01), verts=40)
     mesh.data.materials.append(mats["mesh"])
     mesh.parent = rig
+    mesh.rotation_euler, mesh.scale = oval
 
     from mathutils import Matrix
 
@@ -567,44 +569,70 @@ def build_pod(name, mats):
         o.data.materials.append(mats[mat])
         bpy.ops.object.shade_smooth()
         o.parent = root
-    # oval grille on the front of the head, 0.5 x 0.24 (pod-front, pod-innerfront), long axis tilted ~33 deg
-    pill("_Slot", (sgn * 0.02, -3.0, 0.49), (0, 1, 0), (sgn * 1.0, 0, -0.65), (0.12, 0.25, 0.025))
-    # long vertical mesh slot on the back of the head, over the stem (pod-back), 0.34 x 0.8: a squircle patch
-    # projected onto the body along -y and lifted 0.006 (so it follows the curved head/stem junction exactly)
-    bmp = bmesh.new()
-    nr, ns, hx, hz, xc, zc = 8, 40, 0.17, 0.4, sgn * -0.06, -0.02
-    cen = bmp.verts.new((0, 0, 0))
-    grid = []
-    for i in range(1, nr + 1):
-        ring = []
+    def stadium(f, hu, hv):
+        """Point at the fraction f of the perimeter of a stadium (capsule) of half sizes hu >= hv."""
+        a, r = hu - hv, hv
+        per = 4 * a + 2 * math.pi * r
+        d = f * per
+        if d < 2 * a:                       # straight side, v = +r
+            return a - d, r
+        d -= 2 * a
+        if d < math.pi * r:                 # cap at -u
+            t = math.pi / 2 + d / r
+            return -a + r * math.cos(t), r * math.sin(t)
+        d -= math.pi * r
+        if d < 2 * a:
+            return -a + d, -r
+        d -= 2 * a
+        t = -math.pi / 2 + d / r
+        return a + r * math.cos(t), r * math.sin(t)
+
+    def patch(nm, centre, ax_u, ax_v, hu, hv, ray_y, mat, lift=0.006, nr=8, ns=64):
+        """Stadium patch (half sizes hu, hv along the unit x-z vectors ax_u, ax_v) centred at the x-z `centre`, projected onto the
+        body along the y direction pointing from `ray_y` (start plane) at the surface and lifted by `lift`."""
+        bmp = bmesh.new()
+        cen = bmp.verts.new((0, 0, 0))
+        grid = []
+        for i in range(1, nr + 1):
+            ring = []
+            for k in range(ns):
+                u, w = stadium(k / ns, hu, hv)
+                u, w = u * i / nr, w * i / nr
+                x_ = centre[0] + u * ax_u[0] + w * ax_v[0]
+                z_ = centre[1] + u * ax_u[1] + w * ax_v[1]
+                okk, loc, nrm, _ix = head.ray_cast(Vector((x_, ray_y, z_)), Vector((0, -math.copysign(1, ray_y), 0)))
+                ring.append(bmp.verts.new(loc + nrm * lift if okk else (0, 0, 0)))
+            grid.append(ring)
         for k in range(ns):
-            t = 2 * math.pi * k / ns
-            c_, s_ = math.cos(t), math.sin(t)
-            u = math.copysign(abs(c_) ** 0.5, c_) * hx * i / nr      # exponent 0.5 on the unit circle -> squircle-ish pill
-            w = math.copysign(abs(s_) ** 0.5, s_) * hz * i / nr
-            okk, loc, nrm, _ix = head.ray_cast(Vector((xc + u, 3.0, zc + w)), Vector((0, -1, 0)))
-            ring.append(bmp.verts.new(loc + nrm * 0.006 if okk else (0, 0, 0)))
-        grid.append(ring)
-    for k in range(ns):
-        bmp.faces.new((cen, grid[0][k], grid[0][(k + 1) % ns]))
-    for r0, r1 in zip(grid, grid[1:]):
-        for k in range(ns):
-            bmp.faces.new((r0[k], r1[k], r1[(k + 1) % ns], r0[(k + 1) % ns]))
-    cen.co = (sum(v.co.x for v in grid[0]) / ns, sum(v.co.y for v in grid[0]) / ns, sum(v.co.z for v in grid[0]) / ns)
-    bmesh.ops.recalc_face_normals(bmp, faces=bmp.faces)
-    slot2 = link(name + "_Slot2", bmp)
-    for p_ in slot2.data.polygons:
-        p_.use_smooth = True
-    slot2.data.materials.append(mats["mesh"])
-    slot2.parent = root
+            bmp.faces.new((cen, grid[0][k], grid[0][(k + 1) % ns]))
+        for r0, r1 in zip(grid, grid[1:]):
+            for k in range(ns):
+                bmp.faces.new((r0[k], r1[k], r1[(k + 1) % ns], r0[(k + 1) % ns]))
+        cen.co = (sum(v.co.x for v in grid[0]) / ns, sum(v.co.y for v in grid[0]) / ns, sum(v.co.z for v in grid[0]) / ns)
+        bmesh.ops.recalc_face_normals(bmp, faces=bmp.faces)
+        ob = link(name + nm, bmp)
+        for p_ in ob.data.polygons:
+            p_.use_smooth = True
+        ob.data.materials.append(mats[mat])
+        ob.parent = root
+    GR = PODS["details"]
+    # dark capsule grille on the front of the head (pod-front, pod-innerfront, pod-3q: 0.5 x 0.28, long axis 33 deg below the x axis)
+    ga = math.radians(GR["grille"]["angle"])
+    patch("_Slot", (sgn * GR["grille"]["xz"][0], GR["grille"]["xz"][1]), (sgn * math.cos(ga), -math.sin(ga)), (sgn * math.sin(ga), math.cos(ga)),
+          GR["grille"]["half"][0], GR["grille"]["half"][1], -3.0, "dark", lift=0.004)
+    # long vertical mesh slot on the back of the head, over the stem (pod-back), 0.34 x 0.8
+    sl = GR["slot"]
+    tl = math.radians(sl.get("tilt", 0.0))
+    patch("_Slot2", (sgn * sl["xz"][0], sl["xz"][1]), (sgn * math.sin(tl), math.cos(tl)), (sgn * math.cos(tl), -math.sin(tl)),
+          sl["half"][1], sl["half"][0], 3.0, "mesh")
 
     # force-sensor flat on the stem front (-y)
     ok, hit, _n, _i = head.ray_cast(Vector((sx0, -3.0, -1.2)), Vector((0, 1, 0)))
     bpy.ops.mesh.primitive_uv_sphere_add(radius=1, segments=24, ring_count=12,
-                                         location=(hit + Vector((0, 0.02, 0))) if ok else (sx0, -0.3, -1.2))
+                                         location=(hit + Vector((0, 0.005, 0))) if ok else (sx0, -0.3, -1.2))
     o = bpy.context.active_object
     o.name = name + "_Sensor"
-    o.scale = (0.05, 0.03, 0.4)
+    o.scale = (0.05, 0.02, 0.4)
     o.data.materials.append(mats["white_rough"])
     bpy.ops.object.shade_smooth()
     o.parent = root
@@ -621,7 +649,7 @@ def pod_clearance(gap=0.03):
         if o.type == "MESH" and o.name.startswith("Pod_") and o.name.endswith(("_Body", "_Tip", "_Mic")):
             if o.name.endswith("_Tip"):
                 # from the profile: displacing the real tip folds its recess rim inwards and the cut fails
-                prof = [(0.0, -gap)] + [(r + gap, z) for r, z in TIP_PROF[1:7]] + [(0.0, TIP_PROF[6][1] + gap)]
+                prof = [(0.0, -gap)] + [(r + gap, z + (gap if z > 0.3 else 0.0)) for r, z in TIP_PROF[1:9]] + [(0.0, max(z for _r, z in TIP_PROF[:9]) + gap)]
                 c = lathe(o.name + "_Clear", prof, steps=56)
                 c.data.transform(o.matrix_world)
                 out.append(c)
