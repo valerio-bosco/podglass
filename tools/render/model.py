@@ -194,6 +194,71 @@ def _shell_curves():
     return c["z"], c["hw"], c["yh"]
 
 
+PLAN_FLAT = float(sys.argv[sys.argv.index("--pf") + 1]) if "--pf" in sys.argv else 0.5    # flat side half length / half width a
+PLAN_W = float(sys.argv[sys.argv.index("--pw") + 1]) if "--pw" in sys.argv else 0.6         # fraction of the end curve over which the curvature ramps up
+
+
+def _end_curve(nc=96):
+    """Unit end curve of the plan section: starts on the flat side (heading +x, curvature 0) and turns by 90 degrees to
+    the end tip. Curvature k(u) = sin^2(pi/2 min(u/w, 1)): zero value and slope at the join (G3 with the straight side), a
+    constant-curvature arc after w. Returns points (x, y) with the start at (0, 0), y running down to the tip (dx, -dy)."""
+    w = PLAN_W
+    n = 4000
+    k = [math.sin(math.pi / 2 * min(i / n / w, 1.0)) ** 2 for i in range(n + 1)]
+    cum = [0.0]
+    for i in range(n):
+        cum.append(cum[-1] + 0.5 * (k[i] + k[i + 1]) / n)
+    sc = (math.pi / 2) / cum[-1]                  # total turning pi/2
+    x = y = 0.0
+    xs, ys = [0.0], [0.0]
+    for i in range(n):
+        th = sc * 0.5 * (cum[i] + cum[i + 1])
+        x += math.cos(th) / n
+        y -= math.sin(th) / n
+        xs.append(x)
+        ys.append(y)
+    idx = [round(n * (i / nc)) for i in range(nc + 1)]
+    return [(xs[i], ys[i]) for i in idx]
+
+
+_END = None
+
+
+def plan_quarter(a, b, nf=28, nc=56):
+    """One quarter of the plan section with half sizes a (x) and b (y): straight side from (0, b) to (f a, b), then the
+    end curve (affinely scaled, so it stays G3) to the tip (a, 0). Same vertex count for every (a, b)."""
+    global _END
+    if _END is None:
+        _END = _end_curve(nc)
+    x0 = PLAN_FLAT * a
+    dx, dy = _END[-1][0], -_END[-1][1]
+    pts = [(x0 * i / nf, b) for i in range(nf)]
+    pts += [(x0 + (a - x0) * px / dx, b + b * py / dy) for px, py in _END]
+    return pts
+
+
+def plan_y(x, a, b):
+    """y of the plan section at |x| (for _back_y), consistent with plan_quarter."""
+    x = abs(x)
+    q = plan_quarter(a, b)
+    if x >= a:
+        return 0.0
+    for (x0, y0), (x1, y1) in zip(q, q[1:]):
+        if x0 <= x <= x1 and x1 > x0:
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    return b
+
+
+def plan_ring(a, b):
+    """Full closed outline (CCW from the +x tip) with the same vertex count for every (a, b)."""
+    q = plan_quarter(a, b)
+    out = list(reversed(q))                                    # tip -> top centre
+    out += [(-x, y) for x, y in q[1:]]                         # top centre -> -x tip
+    out += [(-x, -y) for x, y in reversed(q[:-1])]             # -x tip -> bottom centre
+    out += [(x, -y) for x, y in q[1:-1]]                       # bottom centre -> before the +x tip
+    return out
+
+
 def traced_shell(name, dome=DOME, nlat=48, nlon=192):
     """Case body (closed, base + lid, mirror symmetric about z = H/2). The plan section at parameter t is a
     superellipse (exponent N_PLAN) with half sizes hw(t), yh(t), at height z(t): all three are quintic Beziers fitted
@@ -215,16 +280,11 @@ def traced_shell(name, dome=DOME, nlat=48, nlon=192):
         f = (target - acc[j]) / max(acc[j + 1] - acc[j], 1e-12)
         ts.append(dense[j] + f / 2000)
     half = [(_bez(cz, t), _bez(ch, t), _bez(cy, t)) for t in ts]          # equator -> rim, z falling
-    e = 2.0 / N_PLAN
     bm = bmesh.new()
 
     def ring(z, a_, b_):
-        out = []
-        for k in range(nlon):
-            th = 2 * math.pi * k / nlon
-            out.append(bm.verts.new((a_ * math.copysign(abs(math.cos(th)) ** e, math.cos(th)),
-                                     b_ * math.copysign(abs(math.sin(th)) ** e, math.sin(th)), z)))
-        return out
+        return [bm.verts.new((x, y, z)) for x, y in plan_ring(a_, b_)]
+    nlon = len(plan_ring(1.0, 1.0))
     ncap = 12
     a_r, b_r = half[-1][1], half[-1][2]
     bottom = []
@@ -262,11 +322,11 @@ def inner_shell(name, wall=WALL):
     return ob
 
 
-def clean(obj, dist=4e-4):
-    """Dissolve the sliver faces the exact booleans leave: with weighted normals they shade black."""
+def clean(obj, dist=4e-4, zmax=None):
+    """Dissolve the sliver faces the exact booleans leave: with weighted normals they shade black. `zmax`: only below it."""
     bm = bmesh.new()
     bm.from_mesh(obj.data)
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=dist)
+    bmesh.ops.remove_doubles(bm, verts=[v for v in bm.verts if zmax is None or v.co.z < zmax], dist=dist)
     bmesh.ops.dissolve_degenerate(bm, dist=dist, edges=bm.edges)
     bm.to_mesh(obj.data)
     bm.free()
@@ -320,6 +380,31 @@ def cyl(name, r, depth, loc, rot=(0, 0, 0), verts=32):
     ob.location = loc
     ob.rotation_euler = rot
     return ob
+
+
+def rrect(hu, hv, r, n=14):
+    """Outline of a rounded rectangle (half sizes hu, hv, corner radius r <= min(hu, hv)), CCW, n points per corner."""
+    pts = []
+    for cx, cy, a0 in ((hu - r, hv - r, 0.0), (-hu + r, hv - r, 90.0), (-hu + r, -hv + r, 180.0), (hu - r, -hv + r, 270.0)):
+        for i in range(n + 1):
+            t = math.radians(a0 + 90.0 * i / n)
+            pts.append((cx + r * math.cos(t), cy + r * math.sin(t)))
+    return pts
+
+
+def loft(name, stations, to3d):
+    """Solid through several outlines [(l, [(u, v), ...]), ...] (same point count, in order along l); to3d(u, v, l) maps to
+    world space. With one outline repeated it is a plain prism; growing outlines make a chamfered mouth."""
+    bm = bmesh.new()
+    rings = [[bm.verts.new(to3d(u, v, l)) for u, v in o] for l, o in stations]
+    n = len(rings[0])
+    for r0, r1 in zip(rings, rings[1:]):
+        for k in range(n):
+            bm.faces.new((r0[k], r0[(k + 1) % n], r1[(k + 1) % n], r1[k]))
+    bm.faces.new(rings[0])
+    bm.faces.new(rings[-1][::-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return link(name, bm)
 
 
 # ---- materials -------------------------------------------------------------------------------
@@ -516,8 +601,7 @@ def _back_y(x, z):
     else:
         if zz > rows[0][0]:
             a_, b_ = rows[0][1], rows[0][2]
-    n_ = N_PLAN
-    return max(b_, 0.02) * (1 - min(abs(x) / a_, 1.0) ** n_) ** (1.0 / n_)
+    return plan_y(x, a_, max(b_, 0.02))
 
 
 def _sheet(name, x0, x1, z0, z1, d_in, d_out, round_corners=(), r=HINGE_R, dx=0.05, dz=0.025):
@@ -667,6 +751,58 @@ def hinge_cuts(base, lid, gap):
     clean(base)
 
 
+def refine(obj, boxes, maxlen=0.05, passes=8):
+    """Split the long edges inside the given world boxes ((x0, x1), (y0, y1), (z0, z1)) down to `maxlen`, so an exact
+    boolean there meets small, even triangles instead of the long slivers of the case's cap fans."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    for _ in range(passes):
+        es = []
+        for e in bm.edges:
+            if e.calc_length() <= maxlen:
+                continue
+            m = (e.verts[0].co + e.verts[1].co) / 2
+            if any(bx[0][0] <= m.x <= bx[0][1] and bx[1][0] <= m.y <= bx[1][1] and bx[2][0] <= m.z <= bx[2][1] for bx in boxes):
+                es.append(e)
+        if not es:
+            break
+        bmesh.ops.subdivide_edges(bm, edges=es, cuts=1, use_grid_fill=False)
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+
+
+def outer_details(base):
+    """Crisp outer details, cut after the big edge bevel (so it cannot chew them up) and with chamfered mouths:
+    lanyard recess with two dimples (right end), Lightning slot, speaker holes, thumb step."""
+    lz = SEAM - 0.84
+    # lanyard recess in the right end (reference right shot): white stadium 0.47 (y) x 0.95 (z), 0.05 deep, following
+    # the curved end (floor = the shell moved in by 0.05), with two round dimples (0.37 wide, 0.08 deep) in it
+    lbox = ((W / 2 - 0.5, W / 2 + 0.1), (-0.55, 0.55), (lz - 0.62, lz + 0.62))
+    refine(base, [lbox], 0.025, passes=10)
+    refine(base, [((-0.7, 0.7), (-0.32, 0.32), (-0.1, 0.12)),
+                  ((-1.55, -1.25), (-0.15, 0.15), (-0.1, 0.12)), ((1.3, 2.05), (-0.15, 0.15), (-0.1, 0.12)),
+                  ((-1.5, 1.5), (-1.15, -0.9), (SEAM - 0.4, SEAM + 0.02))], 0.045)
+    xf = W / 2 - 0.05                                    # floor level on the axis: the mouth flares at 45 degrees above it
+    st = [(W / 2 - 0.6, 0.0), (xf, 0.0), (xf + 0.03, 0.03), (xf + 0.45, 0.45)]
+    rec = loft("lany", [(l, rrect(0.235 + d, 0.475 + d, 0.235 + d, 24)) for l, d in st], lambda u, v, l: (l, u, lz + v))
+    boolean(rec, inner_shell("lany_in", wall=0.05))
+    refine(rec, [lbox], 0.025, passes=10)
+    boolean(base, rec)
+    for dz in (-0.235, 0.235):
+        # spherical cap 0.37 wide, 0.08 deep below the floor: steep enough (49 deg) at the rim for a crisp edge
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.2455, segments=64, ring_count=32, location=(xf - 0.08 + 0.2455, 0.0, lz + dz))
+        boolean(base, bpy.context.active_object)
+    # Lightning slot (photo 247): centred, 1.0 x 0.3, rounded ends; speaker holes 1 left + 3 right of it
+    st = [(-0.3, 0.29), (-0.01, 0.0), (0.5, 0.0)]          # 0.02 chamfer at the mouth (bottom face at z = -0.03 .. 0)
+    boolean(base, loft("port", [(l, rrect(0.5 + d, 0.15 + d, 0.14 + d, 12)) for l, d in st], lambda u, v, l: (u, v, l)))
+    for hx in (-1.40, 1.44, 1.67, 1.90):   # see-through in the reference bottom shot: up into the pod cavity
+        boolean(base, cyl("hole", 0.063, 4.4, (hx, 0.0, 0.0), verts=32))
+    boolean(base, thumb_scoop())
+    clean(base)
+    clean(base, 1e-3, zmax=2.5)             # a few micro slivers of the pocket booleans, away from the hinge slots
+
+
 # ---- case ------------------------------------------------------------------------------------
 def build_case(mats, clear=()):
     """Base and lid as two separate objects with a small seam gap. `clear`: pod-shaped cutters (see
@@ -679,20 +815,6 @@ def build_case(mats, clear=()):
     # ---- base
     base = shell("Case_Base")
     boolean(base, rbox("keep", W * 2, D * 2, SEAM - gap + 5, 0.0, segs=1, center=(0, 0, (SEAM - gap - 5) / 2)), "INTERSECT")
-    # lanyard recess in the right end (reference right shot): white stadium 0.47 (y) x 0.95 (z), 0.05 deep,
-    # with two round dimples (0.37 wide, 0.08 deep) in it; no steel eyes
-    lz = SEAM - 0.84
-    boolean(base, rbox("pocket", 0.2, 0.47, 0.47, 0.0, segs=1, center=(W / 2 + 0.05, 0.0, lz)))
-    for dz in (-0.235, 0.235):
-        boolean(base, cyl("pocket_r", 0.235, 0.2, (W / 2 + 0.05, 0.0, lz + dz), rot=(0, math.pi / 2, 0), verts=40))
-    for dz in (-0.27, 0.27):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.26, segments=40, ring_count=20, location=(W / 2 + 0.13, 0.0, lz + dz))
-        boolean(base, bpy.context.active_object)
-    # Lightning slot (photo 247): centered, 1.0 x 0.3, rounded ends; speaker holes 1 left + 3 right of it (reference bottom shot)
-    boolean(base, rbox("port", 1.0, 0.3, 1.0, 0.14, segs=6, center=(0.0, 0.0, 0.0)))
-    for hx in (-1.40, 1.44, 1.67, 1.90):   # see-through in the reference bottom shot: up into the pod cavity
-        boolean(base, cyl("hole", 0.063, 4.4, (hx, 0.0, 0.0), verts=16))
-    boolean(base, thumb_scoop())
     # recessed top face: a thin rim stands around the interior (photos 242/243)
     rec = superell("rec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM - gap + 0.5 - 0.07), dome=0.0, nlat=8, nlon=96)
     boolean(base, rec)
@@ -704,7 +826,9 @@ def build_case(mats, clear=()):
     clean(base)
     blend_wells(base)
     bevel(base, 0.1, 2, angle=35)
-    smooth(base, 35, weighted=True)
+    if "--nod" not in sys.argv:
+        outer_details(base)
+    smooth(base, 35, weighted="--nown" not in sys.argv)
 
     # ---- lid (origin later moved to the hinge axis): solid with two bowls for the pod heads
     lid = shell("Case_Lid")
