@@ -1,7 +1,8 @@
-{ lib, stdenvNoCC, makeWrapper, python3, quickshell, playerctl, wireplumber, hyprland, libnotify }:
+{ lib, stdenvNoCC, makeWrapper, python3, quickshell, qt6, playerctl, wireplumber, hyprland, libnotify }:
 
 let
   python = python3.withPackages (ps: [ ps.bleak ps.dbus-fast ps.cryptography ]);
+  # QT_PLUGIN_PATH: qtimageformats has the WebP reader the card's animated renders need
   # used by the daemon: media control, volume (wpctl), window info (hyprctl), notifications
   runtimeTools = [ playerctl wireplumber hyprland libnotify ];
 in
@@ -27,6 +28,7 @@ stdenvNoCC.mkDerivation {
       --set PODGLASS_BIN $out/bin/podglass \
       --set PODGLASS_PYTHON ${python}/bin/python \
       --set-default PODGLASS_QUICKSHELL ${quickshell}/bin/quickshell \
+      --prefix QT_PLUGIN_PATH : ${qt6.qtimageformats}/lib/qt-6/plugins \
       --suffix PATH : ${lib.makeBinPath runtimeTools}
     runHook postInstall
   '';
