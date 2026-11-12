@@ -1266,6 +1266,8 @@ def main():
         pod.rotation_euler = (-math.radians(POD_TILT), 0, -sx * math.radians(POD_YAW))
     base, lid = build_case(mats, pod_clearance())
     led, pins = build_hardware(mats, lid)
+    for ob in (base, lid):   # last word: micro holes from any later cut (the exact booleans are not deterministic)
+        patch_slivers(ob)
     bpy.ops.wm.save_as_mainfile(filepath=OUT)
     print("saved", OUT)
 
