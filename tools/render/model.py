@@ -921,7 +921,7 @@ def build_case(mats, clear=()):
             continue
         c = field_cutter("bowl", fld, "lid", sx, True)
         # the traced top falls towards the ends: keep the bowl one wall inside the shell or it cuts through
-        boolean(c, inner_shell("inner", 0.13), "INTERSECT")
+        boolean(c, inner_shell("inner", 0.24), "INTERSECT")
         boolean(lid, c)
     lrec = superell("lrec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM + gap - 0.5 + 0.07), dome=0.0, nlat=8, nlon=96)
     boolean(lid, lrec)
