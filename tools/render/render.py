@@ -2,7 +2,7 @@
 
 Run:  nix develop .#render -c blender -b -P tools/render/render.py -- \
         [--model assets/models/airpods-pro2.blend] [--shots shots.toml] [--shot all|name,name]
-        [--device cpu|gpu|auto] [--samples N] [--scale F] [--out assets/renders] [--keep-frames] [--no-manifest]
+        [--device cpu|gpu|auto] [--samples N] [--scale F] [--out assets/renders] [--keep-frames] [--no-manifest] [--manifest-only]
 
 Frames go to <out>/<shot>/NNNN.png, animations are encoded with img2webp (libwebp) into
 <out>/<name>.webp, then <out>/manifest.json is written last (the UI waits for it).
@@ -227,7 +227,28 @@ def encode(frames, dst):
     subprocess.run(cmd, check=True)
 
 
+def write_manifest_only():
+    """--manifest-only: the shots were rendered by several processes in parallel (--shot a,b --no-manifest): write
+    manifest.json from shots.toml and the files that exist, without rendering."""
+    produced = {}
+    for name, shot in cfg["shots"].items():
+        if shot.get("debug"):
+            continue
+        outs = shot["out"] if isinstance(shot["out"], list) else [shot["out"]]
+        for o in outs if shot["kind"] != "anim" else outs[:1]:
+            fname, _, px = o.partition(":")
+            if not (OUT / fname).exists():
+                raise SystemExit(f"missing {OUT / fname}: render shot {name} first")
+            produced[fname] = ({"frames": shot["frames"], "size": shot["size"], "delay_ms": 33} if shot["kind"] == "anim"
+                               else {"size": list(shot["size"]) if not px else [int(px)] * 2})
+    manifest = {"version": 1, "model": Path(MODEL).name, "files": produced, "generated": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
+    print("manifest written", len(produced), "files")
+
+
 def main():
+    if "--manifest-only" in argv:
+        return write_manifest_only()
     sc, cam, lights, floor = setup_scene()
     build_rig()
     home = {n: (tuple(bpy.data.objects[n].location), tuple(bpy.data.objects[n].rotation_euler))
