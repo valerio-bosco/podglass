@@ -510,7 +510,7 @@ def make_materials():
     return {
         "white": material("White gloss", (0.95, 0.94, 0.91), rough=0.13, coat=1.0, coat_rough=0.015, spec=0.6),
         "white_rough": material("White inside", (0.92, 0.91, 0.88), rough=0.35, coat=0.0),
-        "grey_tip": material("Silicone tip", (0.82, 0.77, 0.6), rough=0.55, sss=(0.35, (0.8, 0.82, 0.85))),
+        "grey_tip": material("Silicone tip", (0.93, 0.93, 0.92), rough=0.55, sss=(0.35, (0.9, 0.9, 0.9))),   # white (user, like the reference reference)
         "mesh": material("Mesh", (0.03, 0.03, 0.034), rough=0.6, bump=(420.0, 0.9)),
         "gold": material("Gold", (0.85, 0.62, 0.25), rough=0.3, metal=1.0),
         "steel": material("Steel", (0.82, 0.82, 0.83), rough=0.28, metal=1.0),
