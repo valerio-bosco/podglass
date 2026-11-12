@@ -16,6 +16,13 @@ history: everything decided so far is in `docs/PLAN.md`, `docs/SPIKE.md`, `docs/
 - User decisions: D1 build the 3D model ourselves in Blender (fallback: a model found online),
   D2 GPL-3.0-or-later, D3 autoconnect `in-ear`, D4 English UI, no volume ducking while talking.
 
+## Update 2026-11-12
+
+Model, renders and card animations are on master (see LOG 2026-11-10..12). Renders installed in
+~/.local/share/podglass/renders and assets/renders. Left for the user: rebuild the system with the new
+podglass (docs/INSTALL.md) so the installed UI gets the WebP plugin and the new card logic; then P3.2
+look approval on the real card and P5.3 checklist. Worktrees under ~/Projects/podglass-wt can be removed.
+
 ## Update 2026-11-10 afternoon
 
 W1, W2, W3 are merged into master (worktrees removed). Left: P5.2 install (user: flake input,

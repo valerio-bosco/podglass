@@ -203,3 +203,22 @@ One entry per task: date, task id, model, what was done, what could not be verif
   scoop at the front centre. Pods scaled 0.96 with the case's glossy material. Full set 14 min 27 s.
 - Open gaps: the real notch is wider (about half the width) and mostly in the base (photo 249);
   pods still slightly less glossy than the case; heads now a bit large in the open case.
+
+## 2026-11-10 .. 2026-11-12 - model matched to the reference reference, card animations
+- References: screenshots of the reference model "Apple AirPods Pro (2nd generation)" by  (visual
+  reference only, not downloadable, no licence) taken with the Viewer API (canvas-size screenshots; the
+  sized getScreenShot froze the camera), in assets/reference/shots (gitignored), plus interior and
+  hinge close-ups. tools/render/sf: the same cameras in Blender + silhouette IoU overlays.
+- Case: analytic shell (quintic Bezier profiles, plan with flat front/back and G3 ends), closed height
+  4.51 (base 2.97, lid 1.54), lid 120.3 deg about a fitted hinge axis; steel hinge plate + flush dark bar;
+  pockets derived from the pods on the GPU (pocket_field.py, CuPy), two smooth lid dishes; one flat base
+  top face; crisp lanyard recess, port, speaker holes; green status light. Pods: smooth implicit body
+  (22 parameters fitted on the GPU to 9 silhouettes, IoU 0.956-0.98), B-spline tips (white, user choice).
+- Checks used on every build: pods vs case overlap 0, lid swing 2..121 deg without overlap, no wall
+  < 0.12, 0 non-manifold edges (patch_slivers welds and fills the boolean micro holes).
+- Card: case-open once, spin.webp (one turn, 5 s) while not connected, idle.webp when connected,
+  case-close.webp when the lid closes, then the card exits. Package and dev shell now ship
+  qt6.qtimageformats: without it no .webp ever played (the card showed the placeholder).
+- Full set rendered by two Blender processes in parallel on the GPU (100 % GPU), render.py
+  --manifest-only writes the manifest afterwards. User rule: all numeric work on the GPU
+  (~/.local/share/podglass-gpu/py, CuPy), CPU kept free.
