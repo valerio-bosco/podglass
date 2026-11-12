@@ -429,7 +429,7 @@ def pocket_cutters(clear):
     tmp = tempfile.mkdtemp(prefix="pkfield")
     fin, fout = os.path.join(tmp, "in.npz"), os.path.join(tmp, "out.npz")
     np.savez(fin, v=np.concatenate(vs), f=np.concatenate(fs), seam=SEAM, res=PK_RES, extra=PK_EXTRA, k=PK_K,
-             sigma=PK_SIGMA, lid_sigma=0.10, lid_k=60.0, ztop=SEAM - RIM_Z + 0.045, zbot=SEAM + RIM_Z - 0.045)
+             sigma=PK_SIGMA, dish_cx=1.385, dish_cy=PK_Y, dish_a=1.2, dish_b=0.8, dish_n=2.6, ztop=SEAM - RIM_Z + 0.045, zbot=SEAM + RIM_Z - 0.045)
     subprocess.run(["nice", "-n", "19", GPU_PY, os.path.join(os.path.dirname(os.path.abspath(__file__)), "pocket_field.py"), fin, fout], check=True,
                    env={k: v for k, v in os.environ.items() if not k.startswith("PYTHON")})
     d = np.load(fout)

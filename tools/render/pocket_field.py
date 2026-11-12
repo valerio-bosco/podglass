@@ -64,15 +64,21 @@ fl = cp.where(mb, fl - 0.02, fl)
 fl = cp.minimum(fl, ztop)
 fl = nd.gaussian_filter(fl, sigma / res, mode="nearest")
 fl = cp.minimum(fl, ztop)
-# lid: a soft bowl, not the pod bumps: the upper envelope is dilated and blurred (the real bowls are smooth ovals)
-zb0 = zbot - 0.2
-hf = cp.where(cp.isfinite(hi), hi, zb0)
-hf = nd.maximum_filter(hf, size=int(0.2 / res) | 1)
-hf = nd.gaussian_filter(hf, float(d["lid_sigma"]) / res, mode="nearest")
-cl, ml = field(cp.where(hf > zbot + 0.1, -hf, cp.inf), float(d["lid_k"]))
-cl = cp.where(ml, cl - 0.02, cl)
-cl = cp.minimum(cl, -zbot)                      # (negated) clamp at the rim face
-cl = nd.gaussian_filter(cl, float(d["lid_sigma"]) * 0.5 / res, mode="nearest")
-cl = cp.minimum(cl, -zbot)
+# lid: two separate smooth dishes (superellipse plan, one smooth depth curve), deep enough for the pods
+xs = X0 + (cp.arange(nx) + 0.5) * res
+ys = Y0 + (cp.arange(ny) + 0.5) * res
+cx, cy, da, db, dn = (float(d[n_]) for n_ in ("dish_cx", "dish_cy", "dish_a", "dish_b", "dish_n"))
+cl = cp.full((nx, ny), zbot, cp.float32)
+ml = cp.zeros((nx, ny), bool)
+for sx in (-1, 1):
+    r = ((cp.abs(xs[:, None] - sx * cx) / da) ** dn + (cp.abs(ys[None, :] - cy) / db) ** dn) ** (1.0 / dn)
+    g = cp.sqrt(cp.clip(1.0 - r ** 2.2, 0.0, 1.0))
+    need = cp.where((r < 0.85) & cp.isfinite(hi), (hi + 0.06 - zbot) / cp.maximum(g, 0.3), 0.0)
+    D = float(need.max())
+    print("dish depth", D)
+    cl = cp.maximum(cl, zbot + D * g)
+    ml |= r < 1.0
+cl = nd.gaussian_filter(cl, 0.03 / res, mode="nearest")
+cl = -cl                                        # (kept negated below)
 np.savez(outp, x0=X0, y0=Y0, res=res, base=cp.asnumpy(fl), lid=-cp.asnumpy(cl), mb=cp.asnumpy(mb), ml=cp.asnumpy(ml))
 print("field ok", fl.shape, float(mb.sum()) * res * res, float(ml.sum()) * res * res)
