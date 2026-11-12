@@ -31,6 +31,8 @@
       devShells = forAll (pkgs: {
         default = pkgs.mkShell {
           packages = [ (pythonFor pkgs) pkgs.quickshell pkgs.playerctl pkgs.libwebp pkgs.libnotify ];
+          # WebP reader for the card's animated renders (AnimatedImage)
+          QT_PLUGIN_PATH = "${pkgs.qt6.qtimageformats}/lib/qt-6/plugins";
         };
         # Blender is large: only for the render tasks (phase 3)
         render =

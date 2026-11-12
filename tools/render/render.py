@@ -2,7 +2,7 @@
 
 Run:  nix develop .#render -c blender -b -P tools/render/render.py -- \
         [--model assets/models/airpods-pro2.blend] [--shots shots.toml] [--shot all|name,name]
-        [--device cpu|gpu|auto] [--samples N] [--scale F] [--out assets/renders] [--keep-frames] [--no-manifest]
+        [--device cpu|gpu|auto] [--samples N] [--scale F] [--out assets/renders] [--keep-frames] [--no-manifest] [--manifest-only]
 
 Frames go to <out>/<shot>/NNNN.png, animations are encoded with img2webp (libwebp) into
 <out>/<name>.webp, then <out>/manifest.json is written last (the UI waits for it).
@@ -153,6 +153,12 @@ def setup_scene():
         ob = bpy.data.objects.new(name, ld)
         sc.collection.objects.link(ob)
         lights[name] = ob
+        if c.get("pods_only"):  # light linking: this light only lights the pods (crisp highlights on the small heads)
+            coll = bpy.data.collections.new("PodsReceive")
+            for o in sc.objects:
+                if o.name.startswith("Pod_"):
+                    coll.objects.link(o)
+            ob.light_linking.receiver_collection = coll
 
     bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, 0))
     floor = bpy.context.active_object
@@ -221,10 +227,32 @@ def encode(frames, dst):
     subprocess.run(cmd, check=True)
 
 
+def write_manifest_only():
+    """--manifest-only: the shots were rendered by several processes in parallel (--shot a,b --no-manifest): write
+    manifest.json from shots.toml and the files that exist, without rendering."""
+    produced = {}
+    for name, shot in cfg["shots"].items():
+        if shot.get("debug"):
+            continue
+        outs = shot["out"] if isinstance(shot["out"], list) else [shot["out"]]
+        for o in outs if shot["kind"] != "anim" else outs[:1]:
+            fname, _, px = o.partition(":")
+            if not (OUT / fname).exists():
+                raise SystemExit(f"missing {OUT / fname}: render shot {name} first")
+            produced[fname] = ({"frames": shot["frames"], "size": shot["size"], "delay_ms": 33} if shot["kind"] == "anim"
+                               else {"size": list(shot["size"]) if not px else [int(px)] * 2})
+    manifest = {"version": 1, "model": Path(MODEL).name, "files": produced, "generated": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2))
+    print("manifest written", len(produced), "files")
+
+
 def main():
+    if "--manifest-only" in argv:
+        return write_manifest_only()
     sc, cam, lights, floor = setup_scene()
     build_rig()
-    home = {n: tuple(bpy.data.objects[n].location) for n in ("Pod_L", "Pod_R")}  # in-case pose from model.py
+    home = {n: (tuple(bpy.data.objects[n].location), tuple(bpy.data.objects[n].rotation_euler))
+            for n in ("Pod_L", "Pod_R")}  # in-case pose from model.py
     names = [k for k, v in cfg["shots"].items() if not v.get("debug")] if WANT == "all" else WANT.split(",")
     OUT.mkdir(parents=True, exist_ok=True)
     produced = {}
@@ -234,8 +262,7 @@ def main():
         # reset pose of the two pods to the in-case pose (shot "place" overrides them)
         for n in ("Pod_L", "Pod_R"):
             o = bpy.data.objects[n]
-            o.location = home[n]
-            o.rotation_euler = (0, 0, 0)
+            o.location, o.rotation_euler = home[n]
             bpy.data.objects[n + "_TipRig"].rotation_euler = (0, (1 if n.endswith("_L") else -1) * math.radians(shot.get("tip_tilt", CAM.get("tip_tilt", 20.0))), 0)
         only = shot.get("only")
         for o in bpy.data.objects:
@@ -262,7 +289,8 @@ def main():
             for i in range(n):
                 lid = shot["lid"]
                 f = lid[0] + (lid[1] - lid[0]) * smoothstep(i / (n - 1))
-                yaw = shot.get("yaw", 0.0) * math.sin(2 * math.pi * i / n)
+                # yaw: +- sway (one sine period); spin: full turns, linear, so the loop is seamless (frame n = frame 0)
+                yaw = shot.get("yaw", 0.0) * math.sin(2 * math.pi * i / n) + shot.get("spin", 0.0) * i / n
                 set_pose(shot, f, yaw)
                 p = fdir / f"{i:04d}.png"
                 render_frame(sc, p, size, shadow)

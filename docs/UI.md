@@ -31,7 +31,8 @@ read, else dark.
 - Top row: title centered ("AirPods Pro", or the device name), 19/600. Close button at top-right:
   30 px circle, fill token, 12 px "x" glyph in secondary. Esc also closes (`dismiss-card`).
 - Render area: 230 tall, centered image 280 x 230. Plays `case-open.webp` once when the card
-  appears, then `idle.webp` in a loop. Placeholder SVG until renders exist.
+  appears, then `spin.webp` in a loop while not connected and `idle.webp` once connected; when the lid
+  closes, `case-close.webp` plays once before the card slides away. Placeholder SVG until renders exist.
 - Bottom area by state:
   - `disconnected`: button full width, 50 tall, radius 14, accent fill, "Connect" 17/600 white.
   - `connecting`: same button in fill token with a 18 px spinner and "Connecting...".
@@ -86,7 +87,9 @@ read, else dark.
 | File | Size (2x) | Use |
 |---|---|---|
 | `case-open.webp` | 560 x 460, 48 frames, 33 ms | card enter |
-| `idle.webp` | 560 x 460, 120 frames loop | card while open |
+| `idle.webp` | 560 x 460, 120 frames loop | card while open and connected (small sway) |
+| `spin.webp` | 560 x 460, 150 frames loop (one turn, 5 s) | card while waiting to connect |
+| `case-close.webp` | 560 x 460, 48 frames, played once | card exit when the lid closes (last frame held) |
 | `case-closed.png` | 560 x 460 | card when lid closed during exit |
 | `pods-pair.png` | 88 x 88 | popover header |
 | `pod-left.png`, `pod-right.png`, `case-small.png` | 44 x 44 and 120 x 120 | ring glyphs, widget |

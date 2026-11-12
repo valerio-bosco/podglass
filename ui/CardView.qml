@@ -24,6 +24,9 @@ Glass {
         : "disconnected"
 
     function closeMenu() { menu.visible = false; }
+    // lid closed while the card is up: play the closing render, the window waits `closeMs` before it exits
+    readonly property int closeMs: render.closeMs
+    function playClose() { render.close(); }
 
     width: 360
     height: column.implicitHeight + 40
@@ -68,10 +71,12 @@ Glass {
         }
 
         Render {
+            id: render
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredWidth: 280
             Layout.preferredHeight: 230
             lidOpen: view.device.lid !== "closed"
+            waiting: view.cardState !== "connected"
             playing: view.playing
         }
 
