@@ -379,8 +379,8 @@ def flat_prism(name, a, b, z0, h, n=N_PLAN, ns=192, flare=0.08, rise=0.035):
     return link(name, bm)
 
 
-def patch_slivers(obj, maxlen=0.03, sides=4):
-    """Close the few micro holes (triangles) the exact booleans leave on the rim: boundary loops of up to `sides` edges."""
+def patch_slivers(obj, maxlen=0.03, sides=8):
+    """Close the few micro holes (triangles) the exact booleans leave on the rim: boundary loops of up to `sides` short edges."""
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     edges = [e for e in bm.edges if e.is_boundary and e.calc_length() < maxlen]
