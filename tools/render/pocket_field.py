@@ -8,6 +8,7 @@ Model: the lower envelope of the pod parts below the seam is the pocket floor, o
 (vertical drop-in). Outside the footprint the floor climbs in a steep parabola (a softly curved wall), then it is
 smoothed. The lid is the mirror: the upper envelope of the parts above the seam.
 """
+import math
 import sys
 
 import cupy as cp
@@ -18,7 +19,7 @@ inp, outp = sys.argv[1:3]
 d = np.load(inp)
 V, F = cp.asarray(d["v"], cp.float32), cp.asarray(d["f"])
 seam, res = float(d["seam"]), float(d["res"])
-extra, k, sigma, ztop, zbot = (float(d[n]) for n in ("extra", "k", "sigma", "ztop", "zbot"))
+extra, k, sigma, ztop, zbot, zr, fr = (float(d[n]) for n in ("extra", "k", "sigma", "ztop", "zbot", "zr", "fr"))
 X0, X1, Y0, Y1 = -3.2, 3.2, -1.3, 1.3
 nx, ny = int(round((X1 - X0) / res)), int(round((Y1 - Y0) / res))
 lo = cp.full((nx, ny), cp.inf, cp.float32)
@@ -61,9 +62,27 @@ def field(env, k):
 # floor: height of the cutter bottom (higher = shallower). ceiling: negate z so the same code applies.
 fl, mb = field(lo, k)
 fl = cp.where(mb, fl - 0.02, fl)
-fl = cp.minimum(fl, ztop)
+fl = cp.minimum(fl, zr + 0.6)                   # a high plateau: the blur below cannot pull the rim down
 fl = nd.gaussian_filter(fl, sigma / res, mode="nearest")
-fl = cp.minimum(fl, ztop)
+# the material surface (pocket floor, flat rim) is rounded at the rim edge by a rolling-ball opening of radius `fr`:
+# the rim stays exactly flat, only the convex pocket edge gets a fillet
+S = cp.minimum(fl, zr)
+rr = int(fr / res)
+offs = [(i, j) for i in range(-rr, rr + 1) for j in range(-rr, rr + 1) if (i * i + j * j) * res * res < fr * fr]
+bh = lambda i, j: math.sqrt(fr * fr - (i * i + j * j) * res * res) - fr
+pad = rr + 1
+Sp = cp.pad(S, pad, mode="edge")
+E = cp.full(S.shape, cp.inf, cp.float32)
+for i, j in offs:
+    E = cp.minimum(E, Sp[pad + i:pad + i + nx, pad + j:pad + j + ny] - bh(i, j))
+Ep = cp.pad(E, pad, mode="edge")
+O = cp.full(S.shape, -cp.inf, cp.float32)
+for i, j in offs:
+    O = cp.maximum(O, Ep[pad - i:pad - i + nx, pad - j:pad - j + ny] + bh(i, j))
+t = cp.clip((O - (zr - 0.03)) / 0.03, 0.0, 1.0)
+# the surface reaches the rim plane at a moderate angle, then stays 0.03 above it (no cut); a light blur removes the
+# ribs the discrete ball leaves (it cannot dip below the rim outside the pocket)
+fl = nd.gaussian_filter(O + 0.03 * t * t, 0.03 / res, mode="nearest")
 # lid: two separate smooth dishes (superellipse plan, one smooth depth curve), deep enough for the pods
 xs = X0 + (cp.arange(nx) + 0.5) * res
 ys = Y0 + (cp.arange(ny) + 0.5) * res

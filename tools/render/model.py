@@ -36,12 +36,13 @@ POD_RISE = -0.07                    # pod root (stem axis, head centre level) ab
                                     # the old 2.70 seam (the seam is now 2.97)
 POD_TILT = 20.0                     # the pods lean forward in the case (the reference pose does not fit: head+tip are 2.0 deep, the case 2.0 inside)
 POD_YAW = 30.0                      # the tips turn towards the case centre (rotation about z, deg, mirrored for the right pod)
-POD_Y = -0.15                       # centres the 1.55 deep tilted pod between the walls
+POD_Y = -0.07                       # centres the 1.55 deep tilted pod between the walls
 POD_DEPTH = 0.93                    # pod depth / width (photos 239/240 vs 242)
 CAVITY_R = 0.95
 PK_N = 3.6                         # pocket outline superellipse exponent (higher: straighter sides, a parallel bridge)
 PK_X, PK_Y, PK_A, PK_B = 1.39, -0.06, 1.22, 0.86   # interior pocket: centre x/y, half axes (reference int-front: x 0.17..2.61, a constant 0.34 bridge)
 PK_N_IN = 7.0                      # exponent of the inner (bridge side) half of the outline: a straight edge, constant-width bridge
+REC_Z = SEAM - 0.09                       # the recess floor (interior rim and bridge): one exactly flat plane, below the rim ring
 RIM_Z = 0.09                       # the interior rim / bridge face sits this far below the seam
 STEM_OFF = 0.12                     # the stem axis sits this far outwards of the head axis (reference pods)
 LED_DROP = 0.78                     # status light below the seam (reference front shot: 0.08 wide)
@@ -359,6 +360,37 @@ def densify(obj, zmin, zmax, maxlen=0.12, rounds=6, sg=1):
     bm.free()
 
 
+def flat_prism(name, a, b, z0, h, n=N_PLAN, ns=192, flare=0.08, rise=0.035):
+    """Superellipse prism with a perfectly flat bottom at z0 (the recess cutter: its floor must be exactly flat). The
+    wall flares outwards by `flare` while rising `rise`: a shallow ramp (no sharp edge for the bevel to chew on)."""
+    bm = bmesh.new()
+
+    def ring(aa, bb, z):
+        return [bm.verts.new((aa * math.copysign(abs(math.cos(t)) ** (2 / n), math.cos(t)),
+                              bb * math.copysign(abs(math.sin(t)) ** (2 / n), math.sin(t)), z))
+                for t in (2 * math.pi * k / ns for k in range(ns))]
+    rs = [ring(a, b, z0), ring(a + flare, b + flare, z0 + rise), ring(a + flare, b + flare, z0 + h)]
+    for r0, r1 in zip(rs, rs[1:]):
+        for k in range(ns):
+            bm.faces.new((r0[k], r0[(k + 1) % ns], r1[(k + 1) % ns], r1[k]))
+    bm.faces.new(rs[0][::-1])
+    bm.faces.new(rs[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return link(name, bm)
+
+
+def patch_slivers(obj, maxlen=0.03, sides=4):
+    """Close the few micro holes (triangles) the exact booleans leave on the rim: boundary loops of up to `sides` edges."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    edges = [e for e in bm.edges if e.is_boundary and e.calc_length() < maxlen]
+    if edges:
+        bmesh.ops.holes_fill(bm, edges=edges, sides=sides)
+        bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+
+
 def boolean(obj, cutter, op="DIFFERENCE", keep=False):
     m = obj.modifiers.new("bool", "BOOLEAN")
     m.operation = op
@@ -494,7 +526,7 @@ def thumb_scoop():
 
 
 GPU_PY = os.environ.get("PODGLASS_GPU_PY", "/home/voodoo/.local/share/podglass-gpu/py")
-PK_RES, PK_EXTRA, PK_K, PK_SIGMA = 0.0125, 0.0, 200.0, 0.045     # field grid, wall start gap, wall parabola, smoothing (cm)
+PK_RES, PK_EXTRA, PK_K, PK_SIGMA = 0.0125, 0.0, 200.0, 0.06     # field grid, wall start gap, wall parabola, smoothing (cm)
 
 
 def pocket_cutters(clear):
@@ -514,7 +546,7 @@ def pocket_cutters(clear):
     tmp = tempfile.mkdtemp(prefix="pkfield")
     fin, fout = os.path.join(tmp, "in.npz"), os.path.join(tmp, "out.npz")
     np.savez(fin, v=np.concatenate(vs), f=np.concatenate(fs), seam=SEAM, res=PK_RES, extra=PK_EXTRA, k=PK_K,
-             sigma=PK_SIGMA, dish_cx=1.385, dish_cy=PK_Y, dish_a=1.2, dish_b=0.8, dish_n=2.6, ztop=SEAM - RIM_Z + 0.045, zbot=SEAM + RIM_Z - 0.045)
+             sigma=PK_SIGMA, dish_cx=1.385, dish_cy=PK_Y, dish_a=1.2, dish_b=0.8, dish_n=2.6, ztop=SEAM - RIM_Z + 0.045, zr=REC_Z, fr=0.09, zbot=SEAM + RIM_Z - 0.045)
     subprocess.run(["nice", "-n", "19", GPU_PY, os.path.join(os.path.dirname(os.path.abspath(__file__)), "pocket_field.py"), fin, fout], check=True,
                    env={k: v for k, v in os.environ.items() if not k.startswith("PYTHON")})
     d = np.load(fout)
@@ -829,7 +861,7 @@ def hinge_cuts(base, lid, gap):
         clean(ob)
         bevel(ob, 0.015, 2, angle=35)
     bevel(bar, 0.015, 2, angle=35)
-    clean(base)
+    clean(base, 1.5e-3)
 
 
 def refine(obj, boxes, maxlen=0.05, passes=8):
@@ -880,7 +912,8 @@ def outer_details(base):
     for hx in (-1.40, 1.44, 1.67, 1.90):   # see-through in the reference bottom shot: up into the pod cavity
         boolean(base, cyl("hole", 0.063, 4.4, (hx, 0.0, 0.0), verts=32))
     boolean(base, thumb_scoop())
-    clean(base)
+    clean(base, 1.5e-3)
+    patch_slivers(base)
     clean(base, 1e-3, zmax=2.5)             # a few micro slivers of the pocket booleans, away from the hinge slots
 
 
@@ -897,7 +930,7 @@ def build_case(mats, clear=()):
     base = shell("Case_Base")
     boolean(base, rbox("keep", W * 2, D * 2, SEAM - gap + 5, 0.0, segs=1, center=(0, 0, (SEAM - gap - 5) / 2)), "INTERSECT")
     # recessed top face: a thin rim stands around the interior (photos 242/243)
-    rec = superell("rec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM - gap + 0.5 - 0.07), dome=0.0, nlat=8, nlon=96)
+    rec = flat_prism("rec", W / 2 - 0.2, D / 2 - 0.2, REC_Z, 1.0)
     boolean(base, rec)
     fld = pocket_cutters(clear) if clear else None
     densify(base, SEAM - 0.2, SEAM)
@@ -907,7 +940,7 @@ def build_case(mats, clear=()):
             boolean(base, pk)
     for c in clear:
         boolean(base, c, keep=True)
-    clean(base)
+    clean(base, 1.5e-3)
     bevel(base, 0.1, 2, angle=35)
     if "--nod" not in sys.argv:
         outer_details(base)
