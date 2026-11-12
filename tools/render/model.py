@@ -516,7 +516,7 @@ def make_materials():
         "steel": material("Steel", (0.82, 0.82, 0.83), rough=0.28, metal=1.0),
         "hinge_dark": material("Hinge bar", (0.2, 0.19, 0.2), rough=0.4, metal=0.6),
         "dark": material("Dark", (0.01, 0.01, 0.012), rough=0.5),
-        "led": material("LED", (0.6, 1.0, 0.55), rough=0.4, emission=((0.6, 1.0, 0.55), 6.0)),
+        "led": material("LED", (0.1, 0.9, 0.3), rough=0.4, emission=((0.1, 1.0, 0.35), 2.0)),   # green status light: low strength or it burns to white
     }
 
 

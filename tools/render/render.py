@@ -268,7 +268,8 @@ def main():
             for i in range(n):
                 lid = shot["lid"]
                 f = lid[0] + (lid[1] - lid[0]) * smoothstep(i / (n - 1))
-                yaw = shot.get("yaw", 0.0) * math.sin(2 * math.pi * i / n)
+                # yaw: +- sway (one sine period); spin: full turns, linear, so the loop is seamless (frame n = frame 0)
+                yaw = shot.get("yaw", 0.0) * math.sin(2 * math.pi * i / n) + shot.get("spin", 0.0) * i / n
                 set_pose(shot, f, yaw)
                 p = fdir / f"{i:04d}.png"
                 render_frame(sc, p, size, shadow)

@@ -48,6 +48,20 @@ lid = [1.0, 1.0]
 yaw = 8.0              # +- degrees, one sine period over the frames (loops, starts at 0)
 out = "idle.webp"
 
+[shots.case-close]
+kind = "anim"
+frames = 48
+size = [560, 460]
+lid = [1.0, 0.0]       # the opening played backwards with the same ease: card exit when the lid is closed
+yaw = 0.0
+out = "case-close.webp"
+[shots.spin]
+kind = "anim"
+frames = 150           # 5 s per turn at 33 ms
+size = [560, 460]
+lid = [1.0, 1.0]
+spin = 360.0           # one full turn about the case centre, lights fixed: card while waiting to connect
+out = "spin.webp"
 [shots.case-closed]
 kind = "still"
 size = [560, 460]

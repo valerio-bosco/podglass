@@ -43,6 +43,11 @@ PanelWindow {
             card.forceActiveFocus();
         } else if (visible) {
             enterAnim.stop();
+            // the lid was closed: let the case close on the card first, then slide away
+            const closing = card.device.lid === "closed" && card.closeMs > 0;
+            if (closing)
+                card.playClose();
+            hold.duration = closing ? card.closeMs : 0;
             exitAnim.restart();
         }
     }
@@ -55,6 +60,7 @@ PanelWindow {
     }
     SequentialAnimation {
         id: exitAnim
+        PauseAnimation { id: hold; duration: 0 }
         ParallelAnimation {
             NumberAnimation { target: card; property: "slide"; to: Theme.reduceMotion ? 0 : 40; duration: 220; easing.type: Easing.InCubic }
             NumberAnimation { target: card; property: "opacity"; to: 0; duration: 220; easing.type: Easing.InCubic }
