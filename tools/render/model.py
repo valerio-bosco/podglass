@@ -11,7 +11,11 @@ All dimensions below are in cm and come from the real Pro 2 Lightning case (60.6
 import json
 import math
 import os
+import subprocess
 import sys
+import tempfile
+
+import numpy as np
 
 import bmesh
 import bpy
@@ -273,6 +277,28 @@ def clean(obj, dist=4e-4):
     obj.data.update()
 
 
+def densify(obj, zmin, zmax, maxlen=0.12, rounds=6, sg=1):
+    """Split the long edges of the flat faces between zmin and zmax: the exact boolean would otherwise leave long fan
+    triangles on the rim face (they shade as streaks)."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+
+    def sel(f):                                  # flat faces inside the recess, away from the outer rim ring
+        c = f.calc_center_median()
+        return (zmin < c.z < zmax and sg * f.normal.z > 0.9
+                and (abs(c.x) / (W / 2 - 0.35)) ** 3 + (abs(c.y) / (D / 2 - 0.35)) ** 3 < 1.0)
+    bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if sel(f)])
+    for _ in range(rounds):
+        faces = [f for f in bm.faces if sel(f)]
+        edges = list({e for f in faces for e in f.edges if e.calc_length() > maxlen})
+        if not edges:
+            break
+        bmesh.ops.subdivide_edges(bm, edges=edges, cuts=1, use_grid_fill=True)
+        bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3])
+    bm.to_mesh(obj.data)
+    bm.free()
+
+
 def boolean(obj, cutter, op="DIFFERENCE", keep=False):
     m = obj.modifiers.new("bool", "BOOLEAN")
     m.operation = op
@@ -382,6 +408,61 @@ def thumb_scoop():
     return rbox("thumb", w, 0.3, top - (SEAM - h), r, segs=4, center=(0, -D / 2 + depth - 0.15, (top + SEAM - h) / 2))
 
 
+GPU_PY = os.environ.get("PODGLASS_GPU_PY", "/home/voodoo/.local/share/podglass-gpu/py")
+PK_RES, PK_EXTRA, PK_K, PK_SIGMA = 0.0125, 0.0, 200.0, 0.045     # field grid, wall start gap, wall parabola, smoothing (cm)
+
+
+def pocket_cutters(clear):
+    """Base pocket and lid bowl cutters as height fields derived from the pods (see pocket_field.py, run on the GPU):
+    the smallest smooth cavity that lets each pod drop in vertically, with a small uniform clearance."""
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    vs, fs, off = [], [], 0
+    for c in clear:
+        me = c.evaluated_get(dg).to_mesh()
+        me.calc_loop_triangles()
+        v = np.array([c.matrix_world @ p.co for p in me.vertices], dtype=np.float32).reshape(-1, 3)
+        f = np.array([t.vertices[:] for t in me.loop_triangles], dtype=np.int64).reshape(-1, 3)
+        vs.append(v)
+        fs.append(f + off)
+        off += len(v)
+    tmp = tempfile.mkdtemp(prefix="pkfield")
+    fin, fout = os.path.join(tmp, "in.npz"), os.path.join(tmp, "out.npz")
+    np.savez(fin, v=np.concatenate(vs), f=np.concatenate(fs), seam=SEAM, res=PK_RES, extra=PK_EXTRA, k=PK_K,
+             sigma=PK_SIGMA, lid_sigma=0.10, lid_k=60.0, ztop=SEAM - RIM_Z + 0.045, zbot=SEAM + RIM_Z - 0.045)
+    subprocess.run(["nice", "-n", "19", GPU_PY, os.path.join(os.path.dirname(os.path.abspath(__file__)), "pocket_field.py"), fin, fout], check=True,
+                   env={k: v for k, v in os.environ.items() if not k.startswith("PYTHON")})
+    d = np.load(fout)
+    return d
+
+
+def field_cutter(name, d, key, sx, up):
+    """Closed solid from a height field patch around the pocket on side sx: floor = field (cutter bottom, or its top
+    when up), the other side a flat plate 0.3 beyond the rim face."""
+    res, x0, y0 = float(d["res"]), float(d["x0"]), float(d["y0"])
+    Z = d[key]
+    i0, i1 = int((sx * PK_X - 1.5 - x0) / res), int((sx * PK_X + 1.5 - x0) / res)
+    j0, j1 = int((-1.05 - y0) / res), int((1.05 - y0) / res)
+    sub = Z[i0:i1, j0:j1]
+    nx, ny = sub.shape
+    xs = x0 + (np.arange(i0, i1) + 0.5) * res
+    ys = y0 + (np.arange(j0, j1) + 0.5) * res
+    plate = (SEAM - 0.5) if up else (SEAM + 0.5)
+    bm = bmesh.new()
+    grid = [[bm.verts.new((xs[i], ys[j], float(sub[i, j]))) for j in range(ny)] for i in range(nx)]
+    for i in range(nx - 1):
+        for j in range(ny - 1):
+            bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]))
+    ring = [(i, 0) for i in range(nx)] + [(nx - 1, j) for j in range(1, ny)] + [(i, ny - 1) for i in range(nx - 2, -1, -1)] + [(0, j) for j in range(ny - 2, 0, -1)]
+    top = [bm.verts.new((xs[i], ys[j], plate)) for i, j in ring]
+    for a in range(len(ring)):
+        b = (a + 1) % len(ring)
+        bm.faces.new((grid[ring[a][0]][ring[a][1]], grid[ring[b][0]][ring[b][1]], top[b], top[a]))
+    bm.faces.new(top[::-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return link(name, bm)
+
+
 def bathtub(name, cx, cy, a, b, z_top, z_bot, rb, n=2.8, up=False, nr=14, ns=96, rh=None, zf=None, rf=0.12, nf=8, n_in=None):
     """Pocket cutter: a superellipse prism (half axes a, b, exponent n) with a rounded bottom corner of radius rb
     (the reference pockets are rounded rectangles hugging the pods). up=True mirrors it (lid bowls: bottom = top)."""
@@ -445,10 +526,10 @@ def stem_well(name, o, sgn, gap):
     B = PODS["body"]
     zb, zt = B["sz"][1], -0.45
     ax = lambda z_: (sgn * (B["sa"][0] + B["ss"][0] * (z_ - B["sa"][2])), B["sa"][1] + B["ss"][1] * (z_ - B["sa"][2]))
-    r_lo = max(B["sr"]) + gap + 0.10
+    r_lo = max(B["sr"]) + gap + 0.04
     def rad(z_):                           # a plain cylinder, flaring (cosine) into a fillet where it meets the pocket floor
         t = min(max((z_ - (zb + 0.55)) / 0.7, 0.0), 1.0)
-        return r_lo + 0.22 * (0.5 - 0.5 * math.cos(math.pi * t))
+        return r_lo + 0.05 * (0.5 - 0.5 * math.cos(math.pi * t))
     zc = zb + 0.15                      # centre of the rounded end cap
     bm = bmesh.new()
     rings = []
@@ -696,13 +777,15 @@ def build_case(mats, clear=()):
     # recessed top face: a thin rim stands around the interior (photos 242/243)
     rec = superell("rec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM - gap + 0.5 - 0.07), dome=0.0, nlat=8, nlon=96)
     boolean(base, rec)
-    for sx in (-1, 1):  # two pockets hugging the pods (reference: rounded rectangles, a bridge between them)
-        pk = bathtub("pocket_b", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.6, 0.8, n=PK_N, rh=0.5, zf=SEAM - RIM_Z, n_in=PK_N_IN, ns=192)
-        boolean(base, pk)
+    fld = pocket_cutters(clear) if clear else None
+    densify(base, SEAM - 0.2, SEAM)
+    for sx in (-1, 1):  # two pockets hugging the pods: the smallest smooth cavity that lets the pod drop in
+        if fld is not None:
+            pk = field_cutter("pocket_b", fld, "base", sx, False)
+            boolean(base, pk)
     for c in clear:
         boolean(base, c, keep=True)
     clean(base)
-    blend_wells(base)
     bevel(base, 0.1, 2, angle=35)
     smooth(base, 35, weighted=True)
 
@@ -710,12 +793,15 @@ def build_case(mats, clear=()):
     lid = shell("Case_Lid")
     boolean(lid, rbox("keep", W * 2, D * 2, LID_H * 2, 0.0, segs=1, center=(0, 0, H - LID_H + gap + LID_H)), "INTERSECT")
     for sx in (-1, 1):
-        c = bathtub("bowl", sx * PK_X, PK_Y, PK_A, PK_B, SEAM + 0.3, SEAM - 1.05, 1.35, n=PK_N, up=True, rh=0.8, zf=SEAM - 0.09, n_in=PK_N_IN)
+        if fld is None:
+            continue
+        c = field_cutter("bowl", fld, "lid", sx, True)
         # the traced top falls towards the ends: keep the bowl one wall inside the shell or it cuts through
-        boolean(c, inner_shell("inner"), "INTERSECT")
+        boolean(c, inner_shell("inner", 0.13), "INTERSECT")
         boolean(lid, c)
     lrec = superell("lrec", W / 2 - 0.2, D / 2 - 0.2, 0.5, center=(0, 0, SEAM + gap - 0.5 + 0.07), dome=0.0, nlat=8, nlon=96)
     boolean(lid, lrec)
+    densify(lid, SEAM, SEAM + 0.2, sg=-1)
     for c in clear:
         boolean(lid, c)
     hinge_cuts(base, lid, gap)
