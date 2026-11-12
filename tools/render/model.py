@@ -326,6 +326,7 @@ def cyl(name, r, depth, loc, rot=(0, 0, 0), verts=32):
 def material(name, color, rough=0.3, metal=0.0, coat=0.0, coat_rough=0.05, emission=None, bump=None, spec=0.5, sss=None):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
+    m.diffuse_color = (*color, 1)      # viewport (workbench) colour
     nt = m.node_tree
     b = nt.nodes["Principled BSDF"]
     b.inputs["Base Color"].default_value = (*color, 1)
@@ -797,6 +798,7 @@ REF_ROOT = PODS["root"]                # root of the left pod in the reference (
 # silicone tip profile (radius, z along the tip axis), traced from the reference (tools/render/profiles_pod.json): bulb widest
 # near the head, the last three points are the opening and the recess around the mesh
 TIP_PROF = [tuple(p) for p in PODS["tip_prof"]]
+TIP_MESH_R, TIP_MESH_Z, TIP_MESH_DIP = 0.27, 0.235, 0.03   # speaker mesh: radius, rim height on the tip axis, concave dip at the centre
 TIP_CTRL = PODS["tip_ctrl"]            # smooth B-spline meridian of the tip (pod_shape.tip_mesh), fitted to TIP_PROF
 
 
@@ -852,7 +854,15 @@ def build_pod(name, mats):
     tip.data.materials.append(mats["grey_tip"])
     tip.parent = rig
     tip.rotation_euler, tip.scale = oval
-    mesh = cyl(name + "_Mesh", 0.245, 0.02, (0, 0, TIP_PROF[-1][1] + 0.01), verts=40)
+    mv, mf = pod_shape.mesh_dome(TIP_MESH_R, TIP_MESH_Z, TIP_MESH_DIP)
+    bmm = bmesh.new()
+    mvv = [bmm.verts.new(tuple(p_)) for p_ in mv]
+    for f_ in mf:
+        bmm.faces.new([mvv[i] for i in f_])
+    bmesh.ops.recalc_face_normals(bmm, faces=bmm.faces)
+    mesh = link(name + "_Mesh", bmm)
+    for p_ in mesh.data.polygons:
+        p_.use_smooth = True
     mesh.data.materials.append(mats["mesh"])
     mesh.parent = rig
     mesh.rotation_euler, mesh.scale = oval
