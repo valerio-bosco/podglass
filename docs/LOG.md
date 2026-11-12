@@ -204,11 +204,10 @@ One entry per task: date, task id, model, what was done, what could not be verif
 - Open gaps: the real notch is wider (about half the width) and mostly in the base (photo 249);
   pods still slightly less glossy than the case; heads now a bit large in the open case.
 
-## 2026-11-10 .. 2026-11-12 - model matched to the reference reference, card animations
-- References: screenshots of the reference model "Apple AirPods Pro (2nd generation)" by  (visual
-  reference only, not downloadable, no licence) taken with the Viewer API (canvas-size screenshots; the
-  sized getScreenShot froze the camera), in assets/reference/shots (gitignored), plus interior and
-  hinge close-ups. tools/render/sf: the same cameras in Blender + silhouette IoU overlays.
+## 2026-11-10 .. 2026-11-12 - model matched to the reference shots, card animations
+- References: the user's photos plus a set of screenshots used only as a visual reference (kept locally in
+  assets/reference/shots, gitignored, never committed or shipped). tools/render/sf renders our model from
+  the same cameras and compares silhouettes (IoU overlays).
 - Case: analytic shell (quintic Bezier profiles, plan with flat front/back and G3 ends), closed height
   4.51 (base 2.97, lid 1.54), lid 120.3 deg about a fitted hinge axis; steel hinge plate + flush dark bar;
   pockets derived from the pods on the GPU (pocket_field.py, CuPy), two smooth lid dishes; one flat base

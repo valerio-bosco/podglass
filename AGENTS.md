@@ -14,8 +14,10 @@ Start with `docs/PLAN.md` section 0, then do exactly one task.
 - Never edit anything outside this repo (`/etc/nixos`, `~/.config/hypr`, serpantinum). Write the
   proposed change in `docs/LOG.md` and ask the user.
 - Never fake a "Human check": stop and ask the user to do it, then record the result.
-- Never commit `assets/models/` or `assets/renders/` (paid 3D model and its renders), keys,
-  or real MAC addresses in docs (fixtures may keep addresses; they rotate).
+- Never commit `assets/models/` (generated .blend, rebuilt by tools/render/model.py) or
+  `assets/reference/` (the user's photos and third-party reference shots: never committed, never
+  named in the repo), keys, or real MAC addresses in docs (fixtures may keep addresses; they rotate).
+  `assets/renders/` is our own work and is committed: re-render and commit it after model changes.
 - Pure modules (`crypto`, `adv`, `aap`, `state`, `policy`, `config`) do no I/O and never raise on
   bad input from the air: return `None` / `Unknown`.
 - Protocol facts come from `docs/PROTOCOL.md` only. If the hardware disagrees, add the fixture and

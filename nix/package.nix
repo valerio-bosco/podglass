@@ -19,6 +19,8 @@ stdenvNoCC.mkDerivation {
     mkdir -p $share/assets $share/tools $out/bin
     cp -r podglass ui $share/
     cp -r assets/placeholder $share/assets/
+    # our renders (tools/render): the UI uses them when assets/renders/manifest.json exists
+    if [ -f assets/renders/manifest.json ]; then cp -r assets/renders $share/assets/; fi
     cp tools/demo_state.py $share/tools/
     find $share -name __pycache__ -type d -prune -exec rm -rf {} +
     makeWrapper ${python}/bin/python $out/bin/podglass \

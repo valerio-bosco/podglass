@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "model": "airpods-pro2.blend",
+  "files": {
+    "case-open.webp": {
+      "frames": 48,
+      "size": [
+        560,
+        460
+      ],
+      "delay_ms": 33
+    },
+    "idle.webp": {
+      "frames": 120,
+      "size": [
+        560,
+        460
+      ],
+      "delay_ms": 33
+    },
+    "case-close.webp": {
+      "frames": 48,
+      "size": [
+        560,
+        460
+      ],
+      "delay_ms": 33
+    },
+    "spin.webp": {
+      "frames": 150,
+      "size": [
+        560,
+        460
+      ],
+      "delay_ms": 33
+    },
+    "case-closed.png": {
+      "size": [
+        560,
+        460
+      ]
+    },
+    "case-small.png": {
+      "size": [
+        240,
+        240
+      ]
+    },
+    "case-small-44.png": {
+      "size": [
+        44,
+        44
+      ]
+    },
+    "pod-left.png": {
+      "size": [
+        240,
+        240
+      ]
+    },
+    "pod-left-44.png": {
+      "size": [
+        44,
+        44
+      ]
+    },
+    "pod-right.png": {
+      "size": [
+        240,
+        240
+      ]
+    },
+    "pod-right-44.png": {
+      "size": [
+        44,
+        44
+      ]
+    },
+    "pods-pair.png": {
+      "size": [
+        176,
+        176
+      ]
+    },
+    "pods-pair-44.png": {
+      "size": [
+        44,
+        44
+      ]
+    }
+  },
+  "generated": "2026-11-12T12:33:26"
+}
