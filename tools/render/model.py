@@ -42,7 +42,7 @@ CAVITY_R = 0.95
 PK_N = 3.6                         # pocket outline superellipse exponent (higher: straighter sides, a parallel bridge)
 PK_X, PK_Y, PK_A, PK_B = 1.39, -0.06, 1.22, 0.86   # interior pocket: centre x/y, half axes (reference int-front: x 0.17..2.61, a constant 0.34 bridge)
 PK_N_IN = 7.0                      # exponent of the inner (bridge side) half of the outline: a straight edge, constant-width bridge
-REC_Z = SEAM - 0.09                       # the recess floor (interior rim and bridge): one exactly flat plane, below the rim ring
+REC_Z = SEAM - 0.02                       # base top face (rim, interior and bridge): ONE flat plane at the seam (user: no recess, no raised lip)
 RIM_Z = 0.09                       # the interior rim / bridge face sits this far below the seam
 STEM_OFF = 0.12                     # the stem axis sits this far outwards of the head axis (reference pods)
 LED_DROP = 0.78                     # status light below the seam (reference front shot: 0.08 wide)
@@ -59,10 +59,10 @@ HINGE_SKIN = 0.06                   # plate thickness (it follows the shell)
 HINGE_MID = 0.82                    # half width of the lid plate's centre piece that reaches below the seam
 HINGE_CLEAR = 0.02                  # clearance of the swept slots
 HINGE_R = 0.09                      # plate corner radius
-HINGE_LUG = 0.13                    # how far the lid plate's centre lug reaches below the seam (it swings into the base)
+HINGE_LUG = 0.09                    # how far the lid plate's centre lug reaches below the seam (it swings into the base)
 HINGE_BAR_Y = (0.76, 0.92)          # one dark trapezoid on the base rim (hinge-inner): y range, half widths at front / back
 HINGE_BAR_HW = (1.15, 1.30)
-HINGE_BAR_Z = (-0.088, -0.084)      # top relative to the seam: flush with the rim face (SEAM - 0.09), a hair proud
+HINGE_BAR_Z = (-0.02, -0.016)       # top relative to the seam: flush with the base top face (REC_Z = SEAM - 0.02), a hair proud
 HINGE_PARTS = {}
 WELLS = []                          # world-space stem well axes (p0, p1), for the floor blend
 N_LID_RIM = float(sys.argv[sys.argv.index("--nrim") + 1]) if "--nrim" in sys.argv else N_PLAN   # plan exponent at the rim, blended to N_PLAN_LID over 0.6 cm
@@ -379,13 +379,24 @@ def flat_prism(name, a, b, z0, h, n=N_PLAN, ns=192, flare=0.08, rise=0.035):
     return link(name, bm)
 
 
-def patch_slivers(obj, maxlen=0.03, sides=8):
-    """Close the few micro holes (triangles) the exact booleans leave on the rim: boundary loops of up to `sides` short edges."""
+def patch_slivers(obj, maxlen=0.03, sides=8, weld=0.006):
+    """Close the few micro holes the exact booleans leave: weld near-coincident boundary vertices (the holes are often
+    open chains, not loops), fill boundary loops of up to `sides` short edges, drop what is left loose."""
     bm = bmesh.new()
     bm.from_mesh(obj.data)
-    edges = [e for e in bm.edges if e.is_boundary and e.calc_length() < maxlen]
-    if edges:
-        bmesh.ops.holes_fill(bm, edges=edges, sides=sides)
+    bv = list({v for e in bm.edges if e.is_boundary for v in e.verts})
+    if bv:
+        bmesh.ops.remove_doubles(bm, verts=bv, dist=weld)
+        edges = [e for e in bm.edges if e.is_boundary and e.calc_length() < maxlen]
+        if edges:
+            bmesh.ops.holes_fill(bm, edges=edges, sides=sides)
+        loose = [e for e in bm.edges if not e.link_faces]
+        if loose:
+            bmesh.ops.delete(bm, geom=loose, context="EDGES")
+        lv = [v for v in bm.verts if not v.link_edges]
+        if lv:
+            bmesh.ops.delete(bm, geom=lv, context="VERTS")
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         bm.to_mesh(obj.data)
     bm.free()
     obj.data.update()
@@ -546,7 +557,7 @@ def pocket_cutters(clear):
     tmp = tempfile.mkdtemp(prefix="pkfield")
     fin, fout = os.path.join(tmp, "in.npz"), os.path.join(tmp, "out.npz")
     np.savez(fin, v=np.concatenate(vs), f=np.concatenate(fs), seam=SEAM, res=PK_RES, extra=PK_EXTRA, k=PK_K,
-             sigma=PK_SIGMA, dish_cx=1.385, dish_cy=PK_Y, dish_a=1.2, dish_b=0.8, dish_n=2.6, ztop=SEAM - RIM_Z + 0.045, zr=REC_Z, fr=0.09, zbot=SEAM + RIM_Z - 0.045)
+             sigma=PK_SIGMA, dish_cx=1.385, dish_cy=PK_Y, dish_a=1.2, dish_b=0.8, dish_n=2.6, ztop=REC_Z + 0.045, zr=REC_Z, fr=0.09, zbot=SEAM + RIM_Z - 0.045)
     subprocess.run(["nice", "-n", "19", GPU_PY, os.path.join(os.path.dirname(os.path.abspath(__file__)), "pocket_field.py"), fin, fout], check=True,
                    env={k: v for k, v in os.environ.items() if not k.startswith("PYTHON")})
     d = np.load(fout)
@@ -929,9 +940,6 @@ def build_case(mats, clear=()):
     # ---- base
     base = shell("Case_Base")
     boolean(base, rbox("keep", W * 2, D * 2, SEAM - gap + 5, 0.0, segs=1, center=(0, 0, (SEAM - gap - 5) / 2)), "INTERSECT")
-    # recessed top face: a thin rim stands around the interior (photos 242/243)
-    rec = flat_prism("rec", W / 2 - 0.2, D / 2 - 0.2, REC_Z, 1.0)
-    boolean(base, rec)
     fld = pocket_cutters(clear) if clear else None
     densify(base, SEAM - 0.2, SEAM)
     for sx in (-1, 1):  # two pockets hugging the pods: the smallest smooth cavity that lets the pod drop in
@@ -1267,7 +1275,7 @@ def main():
     base, lid = build_case(mats, pod_clearance())
     led, pins = build_hardware(mats, lid)
     for ob in (base, lid):   # last word: micro holes from any later cut (the exact booleans are not deterministic)
-        patch_slivers(ob)
+        patch_slivers(ob, maxlen=0.1, sides=12)
     bpy.ops.wm.save_as_mainfile(filepath=OUT)
     print("saved", OUT)
 
